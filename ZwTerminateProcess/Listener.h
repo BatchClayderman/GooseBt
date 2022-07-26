@@ -1,9 +1,9 @@
 #pragma once
 #include <ntifs.h>
 VOID listenerUnload();
-NTSTATUS listenerEntry();
-#if ((!defined _WIN64) && (!defined WIN64))
+NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver);
 VOID DrivenReboot();
+#if (!(defined _WIN64 || defined WIN64))
 VOID DrivenShutdown();
 #endif
 VOID DrivenError();

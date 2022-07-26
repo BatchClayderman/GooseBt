@@ -82,11 +82,7 @@ BOOLEAN GetProcessName(ULONG dwPid, char* dwImageName, BOOLEAN reduceDbgPrint)
 	if (!NT_SUCCESS(status))
 	{
 		if (!reduceDbgPrint)
-		{
-			DbgPrint(_ZwTerminateProcess_H);
-			DbgPrint("->GetProcessName(%u)->", dwPid);
-			DbgPrint("Error opening process!\n");
-		}
+			DbgPrint("%s->GetProcessName(%u)->Error opening process! \n", _ZwTerminateProcess_H, dwPid);
 		return FALSE;
 	}
 
@@ -97,11 +93,7 @@ BOOLEAN GetProcessName(ULONG dwPid, char* dwImageName, BOOLEAN reduceDbgPrint)
 		char ProcessName[MAX_PATH] = { 0 };
 		strcpy_s(ProcessName, MAX_PATH, (char*)PsGetProcessImageFileName(EProcess));
 		if (!reduceDbgPrint)
-		{
-			DbgPrint(_ZwTerminateProcess_H);
-			DbgPrint("->GetProcessName(%u)->", dwPid);
-			DbgPrint("PID = %u\t\tImageName = %s\n", dwPid, PsGetProcessImageFileName(EProcess));
-		}
+			DbgPrint("%s->GetProcessName(%u)->PID = %u\t\tImageName = %s\n", _ZwTerminateProcess_H, dwPid, dwPid, PsGetProcessImageFileName(EProcess));
 		if (dwImageName)
 			strcpy_s(dwImageName, MAX_PATH, ProcessName);
 		ZwClose(ProcessHandle);//关闭驱动句柄
@@ -110,11 +102,7 @@ BOOLEAN GetProcessName(ULONG dwPid, char* dwImageName, BOOLEAN reduceDbgPrint)
 	else
 	{
 		if (!reduceDbgPrint)
-		{
-			DbgPrint(_ZwTerminateProcess_H);
-			DbgPrint("->GetProcessName(%u)->", dwPid);
-			DbgPrint("Get ProcessName error!\n");//获取失败
-		}
+			DbgPrint("%s->GetProcessName(%u)->Get ProcessName error! \n", _ZwTerminateProcess_H, dwPid);//获取失败
 		return FALSE;
 	}
 }
@@ -238,7 +226,7 @@ BOOLEAN ZeroKill(ULONG PID)
 	return FALSE;
 }
 
-/* 两种结束 */
+/* 通过 PID 结束 */
 BOOLEAN PIDCallTerminate(DWORD targetPID)
 {
 	DbgPrint("%s->ZwTerminate(%d)\n", _ZwTerminateProcess_H, targetPID);
@@ -275,13 +263,14 @@ VOID ZwKillImage(char* dwProcessName)
 	return;
 }
 
+
 /** 驱动重启与关机 **/
-#if ((!defined _WIN64) && (!defined WIN64))
 /* 驱动重启 */
 VOID DrivenReboot()
 {
-	DbgPrint(_ZwTerminateProcess_H);
-	DbgPrint("->DrivenReboot()\n");
+	DbgPrint("%s->DrivenReboot()\n", _ZwTerminateProcess_H);
+	KeBugCheck(POWER_FAILURE_SIMULATE);
+	/*
 	typedef void(__fastcall* FCRB)(void);
 	__asm
 	{
@@ -289,14 +278,22 @@ VOID DrivenReboot()
 		out 64h, al
 		ret
 	}
+	typedef void(__fastcall* FCRB)(void);
+	__asm
+	{
+		mov al, 01
+		out 92h, al
+		ret
+	} // 另一种方案
+	*/
 	return;
 }
 
+#if (!(defined _WIN64 || defined WIN64))
 /* 驱动关机 */
 VOID DrivenShutdown()
 {
-	DbgPrint(_ZwTerminateProcess_H);
-	DbgPrint("->DrivenShutdown()\n");
+	DbgPrint("%s->DrivenShutdown()\n", _ZwTerminateProcess_H);
 	typedef void(__fastcall* FCRB)(void);
 	__asm
 	{
@@ -312,8 +309,7 @@ VOID DrivenShutdown()
 /* 驱动蓝屏 */
 VOID DrivenError()
 {
-	ULONG Error[MAX_PATH][MAX_PATH][MAX_PATH] = { 0 };
-	Error[MAX_PATH - 1][MAX_PATH - 1][MAX_PATH - 1] = 0;
+	RemoveEntryList(NULL);
 	return;
 }
 
@@ -325,9 +321,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 {
 	UNREFERENCED_PARAMETER(pDriver);
 	listenerUnload();
-	DbgPrint("\n");
-	DbgPrint(_ZwTerminateProcess_H);
-	DbgPrint("->DriverUnload()\n");
+	DbgPrint("\n%s->DriverUnload()\n", _ZwTerminateProcess_H);
 	return;
 }
 
@@ -335,9 +329,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 {
 	UNREFERENCED_PARAMETER(pPath);
-	DbgPrint("\n");
-	DbgPrint(_ZwTerminateProcess_H);
-	DbgPrint("->DriverEntry()\n");
+	DbgPrint("\n%s->DriverEntry()\n", _ZwTerminateProcess_H);
 	NTSTATUS bRet = listenerEntry(pDriver);
 	if (!NT_SUCCESS(bRet))
 		return bRet;

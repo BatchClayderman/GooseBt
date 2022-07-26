@@ -80,8 +80,8 @@ KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
-ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
-ClassName="Samples" ; TODO: edit ClassName
+ManufacturerName="GooseBt"
+ClassName="ZwDeleteFile" ; TODO: edit ClassName
 DiskName = "ZwDeleteFile Installation Disk"
 ZwDeleteFile.DeviceDesc = "ZwDeleteFile Device"
 ZwDeleteFile.SVCDESC = "ZwDeleteFile Service"

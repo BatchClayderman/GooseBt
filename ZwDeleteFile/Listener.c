@@ -56,27 +56,26 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 		{
 			/* 处理 DeviceIoControl */
 			PVOID buffer = irp->AssociatedIrp.SystemBuffer;//缓冲区地址
-			//ULONG inlen = irpsp->Parameters.DeviceIoControl.InputBufferLength;//输入缓冲区长度
-			//ULONG outlen = irpsp->Parameters.DeviceIoControl.OutputBufferLength;//输出缓冲区长度
+			ULONG inlen = irpsp->Parameters.DeviceIoControl.InputBufferLength;//输入缓冲区长度
+			ULONG outlen = irpsp->Parameters.DeviceIoControl.OutputBufferLength;//输出缓冲区长度
 
 			/* 根据前面定义好的设备请求功能号，详细判断输入还是输出，我们在这里只判断输入 */
 			switch (irpsp->Parameters.DeviceIoControl.IoControlCode)
 			{
 			case CWK_DVC_SEND_STR:
-				ASSERT(buffer != NULL);
-				ASSERT(inlen > 0);
-				ASSERT(outlen == 0);
-				char temp[MAX_PATH] = { 0 };
-				strcpy_s(temp, MAX_PATH, (char*)buffer);
-				DbgPrint(_ZwDeleteFile_H);
-				DbgPrint("->GetScannerMsg()->\\??\\%s\n", temp);
+				ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen);
+				if (NULL == buffer || inlen >= MAX_PATH || inlen <= 0 || 0 != outlen)
+				{
+					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)", _ZwDeleteFile_H);
+					break;
+				}
 				wchar_t tmp[MAX_PATH] = { 0 };
-				swprintf_s(tmp, MAX_PATH, L"\\??\\%hs", temp);
+				swprintf_s(tmp, MAX_PATH, L"\\??\\%hs", (char*)buffer);
 				UNICODE_STRING uDeletePathName;
-				uDeletePathName.Buffer = tmp;
-				uDeletePathName.Length = (USHORT)((wcslen(tmp)) * sizeof(wchar_t));
-				IBinaryNtZwDeleteFile(uDeletePathName);
-				IBinaryNtSetInformationFileDeleteFile(uDeletePathName);
+				RtlInitUnicodeString(&uDeletePathName, tmp);//uDeletePathName.Buffer = tmp;
+				uDeletePathName.Length = (USHORT)((inlen + 4) * sizeof(wchar_t));
+				DbgPrint("%s->GetScannerMsg()->ZwDeleteFile(\"%wZ\")\n", _ZwDeleteFile_H, &uDeletePathName);
+				GooseBtZwDeleteFile(uDeletePathName);
 				break;
 			case CWK_DVC_RECV_STR:
 			default://到这里的请求都是不接收的（我们没设置接收）
@@ -128,16 +127,14 @@ NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver)
 	if (!NT_SUCCESS(status))
 	{
 		IoDeleteDevice(g_cdo);//删除设备
-		DbgPrint(_ZwDeleteFile_H);
-		DbgPrint("->IoCreateDevice()->Failed!\n");
+		DbgPrint("%s->IoCreateDevice()->Failed! \n", _ZwDeleteFile_H);
 		return status;
 	}
 
 	/* 将所有的分发函数设置为自定义的 */
 	for (ULONG i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
 		pDriver->MajorFunction[i] = cwkDispatch;
-	DbgPrint(_ZwDeleteFile_H);
-	DbgPrint("->IoCreateDevice()->Successful!\n");
+	DbgPrint("%s->IoCreateDevice()->Successful! \n", _ZwDeleteFile_H);
 
 	/* 清除控制设备的初始化标记 */
 	g_cdo->Flags &= ~DO_DEVICE_INITIALIZING;

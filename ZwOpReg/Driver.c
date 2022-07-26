@@ -30,7 +30,8 @@ NTSTATUS ntIBinaryCreateKey(UNICODE_STRING uPathKeyName)
 		&uPathKeyName,
 		OBJ_CASE_INSENSITIVE,//句柄只能内核访问而且只能一个打开
 		NULL,
-		NULL);
+		NULL
+	);
 	status = ZwCreateKey(&hKeyHandle,
 		KEY_ALL_ACCESS,
 		&objAttri,
@@ -70,7 +71,8 @@ NTSTATUS ntIBinaryCreateKey(UNICODE_STRING uPathKeyName)
 		0,
 		NULL,
 		REG_OPTION_NON_VOLATILE,  //创建的 Key 重启是否存在还是临时的
-		&isRegStatus);            //保存 Key 的状态——创建成功还是打开
+		&isRegStatus              //保存 Key 的状态——创建成功还是打开
+	);
 	if (!NT_SUCCESS(status))
 	{
 		ZwClose(hSubKey);
@@ -167,7 +169,9 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPathKeyName)
 			ZwClose(hKey);
 			return ntStatus;
 		}
-		pkfinfo = (PKEY_FULL_INFORMATION)ExAllocatePoolWithTag(PagedPool, uSize, 'niBI');
+		pkfinfo = (PKEY_FULL_INFORMATION)ExAllocatePool2(PagedPool, uSize, 'niBI');
+		if (NULL == pkfinfo)
+			pkfinfo = (PKEY_FULL_INFORMATION)ExAllocatePoolZero(PagedPool, uSize, 'niBI');
 		if (NULL == pkfinfo)
 		{
 			ZwClose(hKey);
@@ -189,13 +193,16 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPathKeyName)
 				KeyBasicInformation,
 				NULL,
 				0,
-				&uSize);
+				&uSize
+			);
 			if (ntStatus != STATUS_BUFFER_OVERFLOW && ntStatus != STATUS_BUFFER_TOO_SMALL)
 			{
 				ZwClose(hKey);
 				return ntStatus;
 			}
-			pBaseinfo = (PKEY_BASIC_INFORMATION)ExAllocatePoolWithTag(PagedPool, uSize, 'niBI');
+			pBaseinfo = (PKEY_BASIC_INFORMATION)ExAllocatePool2(PagedPool, uSize, 'niBI');
+			if (NULL == pBaseinfo)
+				pBaseinfo = (PKEY_BASIC_INFORMATION)ExAllocatePoolZero(PagedPool, uSize, 'niBI');
 			if (NULL == pkfinfo)
 			{
 				ZwClose(hKey);
@@ -206,7 +213,8 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPathKeyName)
 				KeyBasicInformation,
 				pBaseinfo,
 				uSize,
-				&uSize);
+				&uSize
+			);
 			if (!NT_SUCCESS(ntStatus))
 			{
 				if (NULL != pBaseinfo)
@@ -250,7 +258,8 @@ NTSTATUS ntIBinarySetKeyValue(UNICODE_STRING uPathKeyName)
 		&uPathKeyName,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		NULL);
+		NULL
+	);
 	ntStatus = ZwOpenKey(&hKey, KEY_ALL_ACCESS, &objAttri);
 	if (!NT_SUCCESS(ntStatus))
 		return ntStatus;

@@ -13,6 +13,10 @@
 #include <ntifs.h>
 #include <wdm.h>
 #include <ntstrsafe.h>
+#ifdef DeviceName
+#undef DeviceName
+#endif
+#define DeviceName L"\\Device\\GooseBtKMDFReg"
 #define FILE_DEVICE_UNKNOWN 0x00000022
 #define IOCTL_UNKNOWN_BASE FILE_DEVICE_UNKNOWN
 #define IOCTL_CAPTURE_GET_REGEVENTS CTL_CODE(FILE_DEVICE_UNKNOWN, 0x803, METHOD_NEITHER,FILE_READ_DATA | FILE_WRITE_DATA)
@@ -85,7 +89,7 @@ NTSTATUS DriverEntry(
 	PDEVICE_OBJECT pDeviceObject;
 	PCAPTURE_REGISTRY_MANAGER pRegistryManager;
 	// Point uszDriverString at the driver name
-	RtlInitUnicodeString(&uszDriverString, L"[url=file://\\Device\\RegistryMonitor]\\Device\\RegistryMonitor[/url]");
+	RtlInitUnicodeString(&uszDriverString, DeviceName);
 	// Create and initialize device object
 	status = IoCreateDevice(
 		DriverObject,
@@ -98,7 +102,7 @@ NTSTATUS DriverEntry(
 	);
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("RegistryMonitor: ERROR IoCreateDevice ->  [url=file://\\Device\\RegistryMonitor]\\Device\\RegistryMonitor[/url] - %08x\n", status);
+		DbgPrint("RegistryMonitor->IoCreateDevice->%ws->0x%x\n", DeviceName, status);
 		return status;
 	}
 	/* Set global device object to newly created object */
@@ -107,13 +111,12 @@ NTSTATUS DriverEntry(
 	pRegistryManager = gpDeviceObject->DeviceExtension;
 	pRegistryManager->bReady = FALSE;
 	/* Point uszDeviceString at the device name */
-	RtlInitUnicodeString(&uszDeviceString, L"[url=file://\\DosDevices\\RegistryMonitor]\\DosDevices\\RegistryMonitor[/url]");
+	RtlInitUnicodeString(&uszDeviceString, DeviceName);
 	/* Create symbolic link to the user-visible name */
 	status = IoCreateSymbolicLink(&uszDeviceString, &uszDriverString);
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("RegistryMonitor: ERROR IoCreateSymbolicLink ->  [url=file://\\DosDevices\\RegistryMonitor]\\DosDevices\\RegistryMonitor[/url] - %08x\n",
-			status);
+		DbgPrint("RegistryMonitor->IoCreateSymbolicLink->%ws->0x%x\n", DeviceName, status);
 		IoDeleteDevice(pDeviceObject);
 		return status;
 	}
@@ -349,6 +352,8 @@ BOOLEAN QueueRegistryEvent(PREGISTRY_EVENT pRegistryEvent)
 	if ((GetCurrentTime() - pRegistryManager->lastContactTime) <= USERSPACE_CONNECTION_TIMEOUT)
 	{
 		PREGISTRY_EVENT_PACKET pRegistryEventPacket = ExAllocatePool2(NonPagedPool, sizeof(REGISTRY_EVENT_PACKET), REGISTRY_POOL_TAG);
+		if (NULL == pRegistryEventPacket)
+			return FALSE;
 		pRegistryEventPacket->pRegistryEvent = pRegistryEvent;
 		/* Queue registry event */
 		ExInterlockedInsertTailList(&pRegistryManager->lQueuedRegistryEvents, &pRegistryEventPacket->Link,
@@ -367,8 +372,6 @@ NTSTATUS RegistryCallback(IN PVOID CallbackContext,
 	BOOLEAN exception = FALSE;
 	LARGE_INTEGER CurrentSystemTime;
 	LARGE_INTEGER CurrentLocalTime;
-	TIME_FIELDS TimeFields;
-	UNREFERENCED_PARAMETER(TimeFields);//手动醒目
 	int type;
 	UNICODE_STRING registryPath;
 	UCHAR* registryData = NULL;
@@ -530,11 +533,9 @@ NTSTATUS RegistryCallback(IN PVOID CallbackContext,
 	/* Always return a success ... we aren't doing any filtering, just monitoring */
 	return STATUS_SUCCESS;
 }
-void UnloadDriver(IN PDRIVER_OBJECT DriverObject)
+VOID UnloadDriver(IN PDRIVER_OBJECT DriverObject)
 {
 	UNICODE_STRING  uszDeviceString;
-	NTSTATUS        ntStatus;
-	UNREFERENCED_PARAMETER(ntStatus);//手动醒目
 	PCAPTURE_REGISTRY_MANAGER pRegistryManager;
 	/* Get the registry manager from the device extension */
 	pRegistryManager = gpDeviceObject->DeviceExtension;
@@ -548,13 +549,14 @@ void UnloadDriver(IN PDRIVER_OBJECT DriverObject)
 	{
 		PLIST_ENTRY head = ExInterlockedRemoveHeadList(&pRegistryManager->lQueuedRegistryEvents, &pRegistryManager->lQueuedRegistryEventsSpinLock);
 		PREGISTRY_EVENT_PACKET pRegistryEventPacket = CONTAINING_RECORD(head, REGISTRY_EVENT_PACKET, Link);
+		if (NULL == pRegistryEventPacket)
+			return;
 		ExFreePoolWithTag(pRegistryEventPacket->pRegistryEvent, REGISTRY_POOL_TAG);
 		ExFreePoolWithTag(pRegistryEventPacket, REGISTRY_POOL_TAG);
 	}
-	RtlInitUnicodeString(&uszDeviceString, L"[url=file://\\DosDevices\\RegistryMonitor]\\DosDevices\\RegistryMonitor[/url]");
+	RtlInitUnicodeString(&uszDeviceString, DeviceName);
 	IoDeleteSymbolicLink(&uszDeviceString);
 	if (DriverObject->DeviceObject != NULL)
-	{
 		IoDeleteDevice(DriverObject->DeviceObject);
-	}
+	return;
 }

@@ -550,7 +550,7 @@ BOOL GetAdminPermission(_TCHAR* tchar, _TCHAR* _option)//以管理员权限启�
 
 Function AvoidBug()
 {
-	system("chcp 936&title 雨鹅简易反病毒工具&color f&cls");
+	system("chcp 936&title GooseBt 简易文件恶意代码扫描工具&color f&cls");
 	setlocale(LC_CTYPE, "");
 	if (::IsWow64())//关闭重定向
 		::WOW64FsDir(TRUE);
@@ -928,18 +928,18 @@ Function Function5()
 		if (lstrcmp(StrLine, L"MPAVSvc.exe") == 0)//不能用 else if
 			cout << "\t微点杀毒软件" << endl;
 		if (lstrcmp(StrLine, L"PC Hunter Standard 32.exe") == 0)
-			cout << "\tPC Hunter Standard" << endl;
+			cout << "\tPC Hunter Standard x86" << endl;
 		else if (lstrcmp(StrLine, L"PC Hunter Standard 64.exe") == 0)//必须用 else if
-			cout << "\tPC Hunter Standard" << endl;
+			cout << "\tPC Hunter Standard x64" << endl;
 		if (IsWow64() && lstrcmp(StrLine, L"SuperKiller.exe") == 0)
 			cout << "\t360 系统急救箱" << endl;//可能检测失效
 		if (lstrcmp(StrLine, L"Scanner.exe") == 0)
-			cout << "\t雨鹅简易反病毒工具" << endl;
+			cout << "\tGooseBt 简易文件恶意代码扫描工具" << endl;
 		if (lstrcmp(StrLine, L"Defender.exe") == 0)
 			cout << "\t影子系统" << endl;
 		if (lstrcmp(StrLine, L"WinDefender.exe") == 0)
 			cout << "\tWindows Defender" << endl;
-		if (lstrcmp(StrLine, L"hipstray.exe") == 0)
+		if (lstrcmp(StrLine, L"wsctrlsvc.exe") == 0)
 			cout << "\t火绒" << endl;
 		if (lstrcmp(StrLine, L"avp.exe") == 0)
 			cout << "\t卡巴斯基" << endl;
@@ -1743,7 +1743,7 @@ Function Function7()
 		case 5:
 #if (defined WIN32 || defined _WIN64)
 			system("cls");
-			echo("请在 linux 系统上使用，并按任意键返回。", Orange);
+			echo("请在 Linux 系统上使用，并按任意键返回。", Orange);
 			system("pause>nul");
 			return;
 #else
@@ -1830,9 +1830,6 @@ Function Function9(char* msg)//驱动删除文件
 /* main 函数 */
 int main(int argc, char* argv[])
 {
-	char a[] = "C:\\1.txt";
-	Function9(a);
-	return 0;
 	if (argc > 1)
 	{
 		if (IsAboveVistaVersion(_WIN32_WINNT_WIN7) && !IsAdmin())
@@ -1846,7 +1843,7 @@ int main(int argc, char* argv[])
 	while (choice)
 	{
 		system("cls");
-		cout << "欢迎使用雨鹅简易反病毒工具，本程序为您提供如下功能：" << endl;
+		cout << "欢迎使用 GooseBt 简易文件恶意代码扫描工具，本程序为您提供如下功能：" << endl;
 		cout << "\t1 = 读取病毒样本" << endl;
 		cout << "\t2 = 扫描相似病毒" << endl;
 		cout << "\t3 = 疑似病毒上报" << endl;

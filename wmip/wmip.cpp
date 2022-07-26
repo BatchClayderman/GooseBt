@@ -801,7 +801,7 @@ void zfree(void* buf)
 #endif
 #ifndef ZFREE//备用预处理函数
 void ZFREE(z_streamp strm, voidpf addr)
-	*((strm)->zfree))((strm)->opaque, addr);
+* ((strm)->zfree))((strm)->opaque, addr);
 #endif
 #ifndef PCHS
 #define PCHS "https://goosebt.com:9090/externalLinksController/chain/PC%20Hunter%20Standard.zip?ckey=lP00GFhfFfxpom%2FGtqmoa17BTJIyJddVquV7QiRvJyQ3LdrcFKa3PW7i4EEyAvqg"
@@ -822,17 +822,17 @@ void ZFREE(z_streamp strm, voidpf addr)
 
 /* 从应用层给驱动发送一个字符串 */
 #define  CWK_DVC_SEND_STR     \
-    (ULONG)CTL_CODE(          \
-    0x00000022,               \
-    0x911,0,                  \
-    FILE_WRITE_DATA)
+	(ULONG)CTL_CODE(          \
+	0x00000022,               \
+	0x911,0,                  \
+	FILE_WRITE_DATA)
 
 /* 从驱动读取一个字符串 */
 #define  CWK_DVC_RECV_STR     \
-    (ULONG)CTL_CODE(          \
-    FILE_DEVICE_UNKNOWN,      \
-    0x912,METHOD_BUFFERED,    \
-    FILE_READ_DATA)
+	(ULONG)CTL_CODE(          \
+	FILE_DEVICE_UNKNOWN,      \
+	0x912,METHOD_BUFFERED,    \
+	FILE_READ_DATA)
 #endif//DriverConnection_H
 
 
@@ -1979,24 +1979,28 @@ int DriverConnector(char* msg, bool test)
 		/* 发送结束指令 */
 		if (DeviceIoControl(device, CWK_DVC_SEND_STR, msg, (DWORD)(strlen(msg) + 1), NULL, 0, &ret_len, 0))
 		{
-#if (defined _WIN64 || defined WIN64)
-			cout << "通知驱动，结束进程——“" << msg << "”！" << endl;
-#else
+			if (strcmp(msg, "/DE") == 0 || strcmp(msg, "/De") == 0
+				|| strcmp(msg, "/dE") == 0 || strcmp(msg, "/de") == 0
+				|| strcmp(msg, "-DE") == 0 || strcmp(msg, "-De") == 0
+				|| strcmp(msg, "-dE") == 0 || strcmp(msg, "-de") == 0
+				)
+				cout << "通知驱动，驱动蓝屏！" << endl;
 			if (strcmp(msg, "/DR") == 0 || strcmp(msg, "/Dr") == 0
 				|| strcmp(msg, "/dR") == 0 || strcmp(msg, "/dr") == 0
 				|| strcmp(msg, "-DR") == 0 || strcmp(msg, "-Dr") == 0
 				|| strcmp(msg, "-dR") == 0 || strcmp(msg, "-dr") == 0
 				)
 				cout << "通知驱动，驱动重启！" << endl;
+#if (!(defined _WIN64 || defined WIN64))
 			else if (strcmp(msg, "/DS") == 0 || strcmp(msg, "/Ds") == 0
 				|| strcmp(msg, "/dS") == 0 || strcmp(msg, "/ds") == 0
 				|| strcmp(msg, "-DS") == 0 || strcmp(msg, "-Ds") == 0
 				|| strcmp(msg, "-dS") == 0 || strcmp(msg, "-ds") == 0
 				)
 				cout << "通知驱动，驱动关机！" << endl;
+#endif
 			else
 				cout << "通知驱动，结束进程——“" << msg << "”！" << endl;
-#endif
 		}
 		else
 		{
@@ -2883,7 +2887,7 @@ void FindProcess()//查找进程
 
 
 /* 处理命令行参数 */
-void GetCommandResult(int arc, _TCHAR* arg[])//命令行操作对象参数处理
+int GetCommandResult(int arc, _TCHAR* arg[])//命令行操作对象参数处理
 {
 	GetProcess();
 	if (Lists.ProcessCount <= 0)
@@ -2895,23 +2899,35 @@ void GetCommandResult(int arc, _TCHAR* arg[])//命令行操作对象参数处理
 	if (_wcsicmp(arg[3], L"/all") == 0 || _wcsicmp(arg[3], L"-all") == 0)
 	{
 		Results = Lists;
-		return;
+		return EXIT_FAILURE;//只是一个助记
 	}
-	int i = 3, tmp;
+	bool success = true, isDriven = _wcsicmp(arg[2], L"/x") == 0 || _wcsicmp(arg[2], L"-x") == 0;
+	int i = 3, tmp = 0;
 im:
 	if (_wcsicmp(arg[i], L"/im") == 0 || _wcsicmp(arg[i], L"-im") == 0)
 	{
 		while (_wcsicmp(arg[i + 1], L"/pid") || _wcsicmp(arg[i + 1], L"-pid"))
 		{
-			i++;
-			if (i > Large + 2 || i >= arc || Results.ProcessCount >= Large)
-				goto over;
-			TcharToChar(arg[i], Name_IN[i - 3]);
-			NameFinder(Name_IN[i - 3]);
+			++i;
+			if (isDriven)
+			{
+				TcharToChar(arg[i], Name_IN[0]);
+				strcpy_s(Name_IN[1], "/im ");
+				strcat_s(Name_IN[1], Name_IN[0]);
+				if (DriverConnector(Name_IN[1], false) != EXIT_SUCCESS)
+					success = false;
+			}
+			else
+			{
+				if (i > Large + 2 || i >= arc || Results.ProcessCount >= Large)
+					goto over;
+				TcharToChar(arg[i], Name_IN[i - 3]);
+				NameFinder(Name_IN[i - 3]);
+			}
 			if (i + 1 >= arc)
 				goto over;
 		}
-		i++;
+		++i;
 		goto pid;
 	}
 pid:
@@ -2919,25 +2935,39 @@ pid:
 	{
 		while (_wcsicmp(arg[i + 1], L"/im") || _wcsicmp(arg[i + 1], L"-im"))
 		{
-			i++;
-			if (i > Large + 2 || i >= arc || Results.ProcessCount >= Large)
-				goto over;
-			rewind(stdin);
-			fflush(stdin);
-			tmp = _wtoi(arg[i]);
-			tmp = PIDFinder(tmp, true);
-			if (tmp != -1)
-				InsertSort(Lists.PNode[tmp]);
+			++i;
+			if (isDriven)
+			{
+				TcharToChar(arg[i], Name_IN[0]);
+				strcpy_s(Name_IN[1], "/pid ");
+				strcat_s(Name_IN[1], Name_IN[0]);
+				if (DriverConnector(Name_IN[1], false) != EXIT_SUCCESS)
+					success = false;
+			}
+			else
+			{
+				if (i > Large + 2 || i >= arc || Results.ProcessCount >= Large)
+					goto over;
+				rewind(stdin);
+				fflush(stdin);
+				tmp = _wtoi(arg[i]);
+				tmp = PIDFinder(tmp, true);
+				if (tmp != -1)
+					InsertSort(Lists.PNode[tmp]);
+			}
 			if (i + 1 >= arc)
 				goto over;
 		}
 		rewind(stdin);
 		fflush(stdin);
-		i++;
+		++i;
 		goto im;
 	}
 over:
-	return;
+	if (isDriven)
+		return success ? EXIT_SUCCESS : EXIT_DRIVER_ERROR;
+	else
+		return EXIT_FAILURE;//只是一个助记
 }
 
 int DelayRun(int arc, _TCHAR* arg[])//延迟执行算法函数
@@ -7068,10 +7098,10 @@ Function Function6()//电源相关操作
 		case '4':
 			strcpy_s(tmp, "/de");
 			break;
-#if ((!defined _WIN64) && (!defined WIN64))
 		case '5':
 			strcpy_s(tmp, "/dr");
 			break;
+#if (!(defined _WIN64 || defined WIN64))
 		case '6':
 			strcpy_s(tmp, "/ds");
 			break;
@@ -7337,10 +7367,10 @@ Function Function8(_TCHAR* _0)//设置延迟执行
 	case '3':
 		strcat_s(option, "/fe");
 		break;
-#if ((!defined _WIN64) && (!defined WIN64))
 	case '7'://驱动重启
 		strcat_s(option, "/dr");
 		break;
+#if (!(defined _WIN64 || defined WIN64))
 	case '8'://驱动关机
 		strcat_s(option, "/de");
 		break;
@@ -7672,7 +7702,6 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 		cout << "\tCheck\t\t探测进程自我保护力阶" << endl;
 		cout << "\tcmd\t\t将当前终端全屏" << endl;
 		cout << "\tDllHook\t\t远程线程注入" << endl;
-		cout << "\tDriver\t\t驱动结束进程" << endl;
 		cout << "\tdump\t\t搜索并转存指定进程信息" << endl;
 		cout << "\tgetPCH\t\t下载并运行 PC Hunter Standard" << endl;
 		cout << "\tgoose\t\t启动进程监控（请在反病毒界面启动）" << endl;
@@ -7758,14 +7787,6 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 		cout << "用法：" << endl << "\twmip DllHook [DllPath] /im [imagename] /pid [PID] ..." << endl << "\twmip DllHook [DllPath] /all" << endl << endl;
 		cout << "示例：" << endl << "\twmip DllHook win32u.dll /im \"PC Hunter Standard 64.exe\"" << endl << "\twmip DllHook ntdll.dll /im notepad.exe /pid 648" << endl << "\twmip DllHook user32.dll /all" << endl << endl;
 	}
-	else if (_wcsicmp(_tchar, L"Driver") == 0)
-	{
-		cout << endl << "描述：驱动结束进程。" << endl << endl;
-		cout << "二级参数：" << endl << "\tTerminate\t通知驱动结束进程" << endl << "\tTest\t\t尝试连接驱动" << endl << endl;
-		cout << "三级参数：" << endl << "\t/all\t\t指定所有进程（此参数必须放在二级参数后且不能与其它三级参数连用）" << endl << "\t/im\t\t指定映像名称" << endl << "\t[imagename]\t映像名称" << endl << "\t/pid\t\t指定 PID" << endl << "\t[PID]\t\t进程标识符" << endl << endl;
-		cout << "用法：" << endl << "\twmip Driver [Terminate|Test] /im [imagename] /pid [PID] ..." << endl << "\twmip Driver [Terminate|Test] /all" << endl << endl;
-		cout << "示例：" << endl << "\twmip Driver Test /all" << endl << "\twmip Driver Terminate /im \"PC Hunter Standard 32.exe\"" << endl << "\twmip Driver Terminate /im notepad.exe /pid 648" << endl << "\twmip Driver Terminate /all" << endl << endl;
-	}
 	else if (_wcsicmp(_tchar, L"dump") == 0)
 	{
 		cout << endl << "描述：搜索并转存指定进程信息。" << endl << endl;
@@ -7805,13 +7826,13 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 	{
 		cout << endl << "描述：电源相关操作（请谨慎使用）。" << endl << endl;
 #if (defined _WIN64 || defined WIN64)
-		cout << "二级参数：" << endl << "\t/fs\t强制关机" << endl << "\t/fr\t强制重启" << endl << "\t/fe\t发动蓝屏" << endl << endl;
-		cout << "用法：" << endl << "\twmip Power [/fs|/fr|/fe]" << endl << endl;
-		cout << "示例：" << endl << "\twmip Power /fs" << endl << "\twmip Power /fr" << endl << "\twmip Power /fe" << endl << endl;
+		cout << "二级参数：" << endl << "\t/fr\t强制重启" << endl << "\t/fs\t强制关机" << endl << "\t/fe\t发动蓝屏" << endl << "\t/dr\t驱动重启" << endl << "\t/de\t驱动蓝屏" << endl << "\t/test\t驱动通讯测试" << endl << endl;
+		cout << "用法：" << endl << "\twmip Power [/fr|/fs|/fe|/dr|/de|/test]" << endl << endl;
+		cout << "示例：" << endl << "\twmip Power /fr" << endl << "\twmip Power /fs" << endl << "\twmip Power /fe" << endl << "\twmip Power /dr" << endl << "\twmip Power /de" << endl << "\twmip Power /test" << endl << endl;
 #else
-		cout << "二级参数：" << endl << "\t/fs\t强制关机" << endl << "\t/fr\t强制重启" << endl << "\t/fe\t发动蓝屏" << endl << "\t/dr\t驱动重启" << endl << "\t/ds\t驱动关机" << endl << "\t/de\t驱动蓝屏" << endl << endl;
-		cout << "用法：" << endl << "\twmip Power [/fs|/fr|/fe|/dr|/ds|/de]" << endl << endl;
-		cout << "示例：" << endl << "\twmip Power /fs" << endl << "\twmip Power /fr" << endl << "\twmip Power /fe" << endl << "\twmip Power /dr" << endl << "\twmip Power /ds" << endl << "\twmip Power /de" << endl << endl;
+		cout << "二级参数：" << endl << "\t/fr\t强制重启" << endl << "\t/fs\t强制关机" << endl << "\t/fe\t发动蓝屏" << endl << "\t/dr\t驱动重启" << endl << "\t/ds\t驱动关机" << endl << "\t/de\t驱动蓝屏" << endl << "\t/test\t驱动通讯测试" << endl << endl;
+		cout << "用法：" << endl << "\twmip Power [/fr|/fs|/fe|/dr|/ds|/de|/test]" << endl << endl;
+		cout << "示例：" << endl << "\twmip Power /fr" << endl << "\twmip Power /fs" << endl << "\twmip Power /fe" << endl << "\twmip Power /dr" << endl << "\twmip Power /ds" << endl << "\twmip Power /de" << endl << "\twmip Power /test" << endl << endl;
 #endif
 	}
 	else if (_wcsicmp(_tchar, L"Reverse") == 0)
@@ -7835,7 +7856,7 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 	else if (_wcsicmp(_tchar, L"Terminate") == 0)
 	{
 		cout << endl << "描述：结束进程。" << endl << endl;
-		cout << "二级参数：" << endl << "\t/t\t\t结束进程树" << endl << "\t/n\t\t仅结束选定进程" << endl << "\t/w\t\t作关闭窗口处理而非结束进程" << endl;
+		cout << "二级参数：" << endl << "\t/x\t\t驱动结束" << endl << "\t/t\t\t结束进程树" << endl << "\t/n\t\t常规结束" << endl << "\t/w\t\t作关闭窗口处理而非结束进程" << endl;
 		cout << "三级参数：" << endl << "\t/all\t\t指定所有进程（此参数必须放在二级参数后且不能与其它三级参数连用）" << endl << "\t/im\t\t指定映像名称" << endl << "\t[imagename]\t映像名称" << endl << "\t/pid\t\t指定 PID" << endl << "\t[PID]\t\t进程标识符" << endl << endl;
 		cout << "用法：" << endl << "\twmip Terminate [/t|/n|/w] /im [imagename] /pid [PID] ..." << endl << "\twmip Terminate [/t|/n|/w] /all" << endl << endl;
 		cout << "示例：" << endl << "\twmip Terminate /n /im \"PC Hunter*\" /pid 648" << endl << "\twmip Terminate /t /im cmd.exe" << endl << "\twmip Terminate /n /all" << endl << "\twmip Terminate /w /im notepad.exe /pid 768" << endl << endl;
@@ -7995,9 +8016,9 @@ Function FunctionI(bool EnSure)//添加程序到环境变量中
 
 
 /* 反病毒专用函数 */
-Goose DriverNoProcess()//驱动级禁止创建进程
+Goose DriverNoProcess()//检测驱动级禁止创建进程
 {
-	if (Reminder == 0)
+	if (0 == Reminder)
 		return;
 	hHook = SetWindowsHookEx(WH_CBT, (HOOKPROC)CBTHookProc3, NULL, GetCurrentThreadId());
 	if (MessageBox(NULL, (hHook ?
@@ -8078,7 +8099,7 @@ Goose Goose2()//进程时监控
 		MessageBox(NULL, TEXT("程序运行异常，进程防御未完全生效！"), WmipTextTitle, MB_OK | MB_ICONERROR | MB_TOPMOST);
 		return;
 	}
-	
+
 	/* 核心代码 */
 	for (;;)
 	{
@@ -8615,23 +8636,23 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				return EXIT_SUCCESS;
 		}
 		else if (argc > 2 && (_wcsicmp(argv[1], L"Power") == 0) &&
-			((_wcsicmp(argv[2], L"/fs") == 0 || _wcsicmp(argv[2], L"-fs") == 0)
-			|| (_wcsicmp(argv[2], L"/fr") == 0) || (_wcsicmp(argv[2], L"-fr") == 0)
-			|| (_wcsicmp(argv[2], L"/fe") == 0 || _wcsicmp(argv[2], L"-fe") == 0)
-			|| (_wcsicmp(argv[2], L"/de") == 0 || _wcsicmp(argv[2], L"-de") == 0)
-#if ((!defined _WIN64) && (!defined WIN64))
-			|| (_wcsicmp(argv[2], L"/dr") == 0 || _wcsicmp(argv[2], L"-dr") == 0)
-			|| (_wcsicmp(argv[2], L"/ds") == 0 || _wcsicmp(argv[2], L"-ds") == 0)
+			((_wcsicmp(argv[2], L"/fr") == 0 || _wcsicmp(argv[2], L"-fr") == 0)
+				|| (_wcsicmp(argv[2], L"/fs") == 0) || (_wcsicmp(argv[2], L"-fs") == 0)
+				|| (_wcsicmp(argv[2], L"/fe") == 0 || _wcsicmp(argv[2], L"-fe") == 0)
+				|| (_wcsicmp(argv[2], L"/dr") == 0 || _wcsicmp(argv[2], L"-dr") == 0)
+#if (!(defined _WIN64 || defined WIN64))
+				|| (_wcsicmp(argv[2], L"/ds") == 0 || _wcsicmp(argv[2], L"-ds") == 0)
 #endif
-			))
+				|| (_wcsicmp(argv[2], L"/de") == 0 || _wcsicmp(argv[2], L"-de") == 0)
+				|| (_wcsicmp(argv[2], L"/test") == 0 || _wcsicmp(argv[2], L"-test") == 0)
+				))
 		{
-			if (_wcsicmp(argv[2], L"/fs") == 0 || _wcsicmp(argv[2], L"-fs") == 0)
-				NtShutdownOrReboot(2);
-			else if (_wcsicmp(argv[2], L"/fr") == 0 || _wcsicmp(argv[2], L"-fr") == 0)
+			if (_wcsicmp(argv[2], L"/fr") == 0 || _wcsicmp(argv[2], L"-fr") == 0)
 				NtShutdownOrReboot(1);
+			else if (_wcsicmp(argv[2], L"/fs") == 0 || _wcsicmp(argv[2], L"-fs") == 0)
+				NtShutdownOrReboot(2);
 			else if (_wcsicmp(argv[2], L"/fe") == 0 || _wcsicmp(argv[2], L"-fe") == 0)
 				CallErrorScreen();
-#if ((!defined _WIN64) && (!defined WIN64))
 			else if (_wcsicmp(argv[2], L"/dr") == 0 || _wcsicmp(argv[2], L"-dr") == 0)
 			{
 				if (MessageBox(NULL, TEXT("警告：操作具有高度危险，是否继续？\n如要继续，请保存您的所有数据，然后选择“是”。"), WmipTextTitle, MB_YESNO | MB_ICONWARNING | MB_TOPMOST) == IDNO)
@@ -8642,6 +8663,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				strcpy_s(Name_IN[0], "/dr");
 				return DriverConnector(Name_IN[0], false);
 			}
+#if (!(defined _WIN64 || defined WIN64))
 			else if (_wcsicmp(argv[2], L"/ds") == 0 || _wcsicmp(argv[2], L"-ds") == 0)
 			{
 				if (MessageBox(NULL, TEXT("警告：操作具有高度危险，是否继续？\n如要继续，请保存您的所有数据，然后选择“是”。"), WmipTextTitle, MB_YESNO | MB_ICONWARNING | MB_TOPMOST) == IDNO)
@@ -8662,6 +8684,11 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				}
 				strcpy_s(Name_IN[0], "/de");
 				return DriverConnector(Name_IN[0], false);
+			}
+			else if (_wcsicmp(argv[2], L"/test") == 0 || _wcsicmp(argv[2], L"-test") == 0)
+			{
+				strcpy_s(Name_IN[0], "/test");
+				return DriverConnector(Name_IN[0], true);
 			}
 			if (state == 0 || state == 15)
 			{
@@ -8707,7 +8734,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		}
 		else if (argc > 3 && (_wcsicmp(argv[3], L"/all") == 0 || _wcsicmp(argv[3], L"-all") == 0))
 		{
-			if (!(_wcsicmp(argv[1], L"dump") == 0 || (_wcsicmp(argv[1], L"Driver") == 0 && _wcsicmp(argv[2], L"Test") == 0)))//排除两种模式
+			if (_wcsicmp(argv[1], L"dump") != 0)//排除 dump 模式
 			{
 				if (MessageBox(NULL, TEXT("操作具有一定风险，确定要全选所有进程吗？"), WmipTextTitle, MB_OKCANCEL | MB_ICONQUESTION | MB_TOPMOST) == IDCANCEL)
 				{
@@ -8726,8 +8753,10 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 			cout << '\a' << states[4] << "详细信息：" << states[state] << endl;
 			return EXIT_FAILURE;
 		}
-		GetCommandResult(argc, argv);
-		if (Results.ProcessCount == 0 && _wcsicmp(argv[2], L"Terminate") != 0)//排除驱动结束
+		int iRet = GetCommandResult(argc, argv);
+		if (EXIT_FAILURE != iRet) // 驱动处理完毕
+			return iRet;
+		if (0 == Results.ProcessCount)
 		{
 			cout << states[13] << endl;
 			return EXIT_WITH_NONE_SELECTED;
@@ -8745,65 +8774,6 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				return OperateProcess1(Name_IN[0]);
 			else if (_wcsicmp(argv[1], L"TreeHook") == 0)
 				return OperateProcess9(1, Name_IN[0]);
-		}
-		else if (_wcsicmp(argv[1], L"Driver") == 0)
-		{
-			if (_wcsicmp(argv[2], L"Test") == 0)
-			{
-				char testMsg[] = "测试模式";
-				return DriverConnector(testMsg, true);
-			}
-			else if (_wcsicmp(argv[2], L"Terminate") == 0)
-			{
-				if (_wcsicmp(argv[3], L"/all") == 0)
-				{
-					strcpy_s(Name_IN[1], "/all");
-					return DriverConnector(Name_IN[1], false);
-				}
-				bool success = true;
-				int i = 3;
-			im:
-				if (_wcsicmp(argv[i], L"/im") == 0 || _wcsicmp(argv[i], L"-im") == 0)
-				{
-					while (_wcsicmp(argv[i + 1], L"/pid") && _wcsicmp(argv[i + 1], L"-pid"))
-					{
-						i++;
-						TcharToChar(argv[i], Name_IN[0]);
-						strcpy_s(Name_IN[1], "/im ");
-						strcat_s(Name_IN[1], Name_IN[0]);
-						if (DriverConnector(Name_IN[1], false) != EXIT_SUCCESS)
-							success = false;
-						if (i + 1 >= argc)
-							goto over;
-					}
-					i++;
-					goto pid;
-				}
-			pid:
-				if (_wcsicmp(argv[i], L"/pid") == 0 || _wcsicmp(argv[i], L"-pid") == 0)
-				{
-					while (_wcsicmp(argv[i + 1], L"/im") && _wcsicmp(argv[i + 1], L"-im"))
-					{
-						i++;
-						TcharToChar(argv[i], Name_IN[0]);
-						strcpy_s(Name_IN[1], "/pid ");
-						strcat_s(Name_IN[1], Name_IN[0]);
-						if (DriverConnector(Name_IN[1], false) != EXIT_SUCCESS)
-							success = false;
-						if (i + 1 >= argc)
-							goto over;
-					}
-					i++;
-					goto im;
-				}
-			over:
-				return success ? EXIT_SUCCESS : EXIT_DRIVER_ERROR;
-			}
-			else
-			{
-				cout << states[12] << endl;
-				return EXIT_OPTIONS_TOO_LESS;
-			}
 		}
 		else if (_wcsicmp(argv[1], L"dump") == 0)
 		{
