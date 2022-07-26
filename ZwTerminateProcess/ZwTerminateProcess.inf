@@ -1,0 +1,87 @@
+;
+; ZwTerminateProcess.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=GooseBt
+ClassGuid={6C43728A-A556-A504-529B-E63F5D874A3D}
+Provider=Universe
+CatalogFile=ZwTerminateProcess.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+ZwTerminateProcess_Device_CoInstaller_CopyFiles = 11
+
+; ================= Class section =====================
+
+[ClassInstall32]
+Addreg=SampleClassReg
+
+[SampleClassReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-5
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+ZwTerminateProcess.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%ZwTerminateProcess.DeviceDesc%=ZwTerminateProcess_Device, Root\ZwTerminateProcess ; TODO: edit hw-id
+
+[ZwTerminateProcess_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+ZwTerminateProcess.sys
+
+;-------------- Service installation
+[ZwTerminateProcess_Device.NT.Services]
+AddService = ZwTerminateProcess,%SPSVCINST_ASSOCSERVICE%, ZwTerminateProcess_Service_Inst
+
+; -------------- ZwTerminateProcess driver install sections
+[ZwTerminateProcess_Service_Inst]
+DisplayName    = %ZwTerminateProcess.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\ZwTerminateProcess.sys
+
+;
+;--- ZwTerminateProcess_Device Coinstaller installation ------
+;
+
+[ZwTerminateProcess_Device.NT.CoInstallers]
+AddReg=ZwTerminateProcess_Device_CoInstaller_AddReg
+CopyFiles=ZwTerminateProcess_Device_CoInstaller_CopyFiles
+
+[ZwTerminateProcess_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[ZwTerminateProcess_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[ZwTerminateProcess_Device.NT.Wdf]
+KmdfService =  ZwTerminateProcess, ZwTerminateProcess_wdfsect
+[ZwTerminateProcess_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+ClassName="Samples" ; TODO: edit ClassName
+DiskName = "ZwTerminateProcess Installation Disk"
+ZwTerminateProcess.DeviceDesc = "ZwTerminateProcess Device"
+ZwTerminateProcess.SVCDESC = "ZwTerminateProcess Service"

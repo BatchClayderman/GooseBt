@@ -1,0 +1,87 @@
+;
+; KMDFTDI.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=GooseBt
+ClassGuid={6C43728A-A556-A504-529B-E63F5D874A3D}
+Provider=Universe
+CatalogFile=KMDFTDI.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+KMDFTDI_Device_CoInstaller_CopyFiles = 11
+
+; ================= Class section =====================
+
+[ClassInstall32]
+Addreg=SampleClassReg
+
+[SampleClassReg]
+HKR,,,0,%ClassName%
+HKR,,Icon,,-5
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+KMDFTDI.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%KMDFTDI.DeviceDesc%=KMDFTDI_Device, Root\KMDFTDI ; TODO: edit hw-id
+
+[KMDFTDI_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+KMDFTDI.sys
+
+;-------------- Service installation
+[KMDFTDI_Device.NT.Services]
+AddService = KMDFTDI,%SPSVCINST_ASSOCSERVICE%, KMDFTDI_Service_Inst
+
+; -------------- KMDFTDI driver install sections
+[KMDFTDI_Service_Inst]
+DisplayName    = %KMDFTDI.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\KMDFTDI.sys
+
+;
+;--- KMDFTDI_Device Coinstaller installation ------
+;
+
+[KMDFTDI_Device.NT.CoInstallers]
+AddReg=KMDFTDI_Device_CoInstaller_AddReg
+CopyFiles=KMDFTDI_Device_CoInstaller_CopyFiles
+
+[KMDFTDI_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[KMDFTDI_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[KMDFTDI_Device.NT.Wdf]
+KmdfService =  KMDFTDI, KMDFTDI_wdfsect
+[KMDFTDI_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+ClassName="Samples" ; TODO: edit ClassName
+DiskName = "KMDFTDI Installation Disk"
+KMDFTDI.DeviceDesc = "KMDFTDI Device"
+KMDFTDI.SVCDESC = "KMDFTDI Service"
