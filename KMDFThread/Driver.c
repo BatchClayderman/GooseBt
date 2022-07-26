@@ -108,7 +108,7 @@ VOID ProcessCreateMon(IN HANDLE hParentId, IN HANDLE PId, IN BOOLEAN bCreate)
 
 	if (!NT_SUCCESS(status))
 	{
-		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed!\n", _KMDFThread_H);
+		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed! \n", _KMDFThread_H);
 		DbgPrint(msg);
 		return;
 	}
@@ -119,18 +119,18 @@ VOID ProcessCreateMon(IN HANDLE hParentId, IN HANDLE PId, IN BOOLEAN bCreate)
 		lpCurProc = (LPTSTR)EProcess;
 		lpCurProc = lpCurProc + ProcessNameOffset;
 		
-		sprintf(msg, "%s->Created->Process = %s->PID = %d->Address = %x->PPID = %d\n",
-			_KMDFThread_H,
-			lpCurProc,
-			(int)PId,
-			(ULONG)EProcess,
-			(int)hParentId
+		sprintf(msg, "%s->Created->Process = %s->PID = %u->Address = 0x%x->PPID = %u\n",
+			_KMDFThread_H, 
+			lpCurProc, 
+			HandleToULong(PId), 
+			(ULONG)EProcess, 
+			HandleToULong(hParentId)
 		);
 		DbgPrint(msg);
 	}
 	else
 	{
-		sprintf(msg, "%s->Terminated->PID = %d\n", _KMDFThread_H, (int)PId);
+		sprintf(msg, "%s->Terminated->PID = %u\n", _KMDFThread_H, HandleToULong(PId));
 		DbgPrint(msg);
 	}
 	return;
@@ -158,7 +158,7 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 
 	if (!NT_SUCCESS(status))
 	{
-		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed!\n", _KMDFThread_H);
+		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed! \n", _KMDFThread_H);
 		DbgPrint(msg);
 		return;
 	}
@@ -172,14 +172,14 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 			lpParnentProc = (LPTSTR)ParentEProcess;
 			lpCurProc += ProcessNameOffset;
 			lpParnentProc += ProcessNameOffset;
-			sprintf(msg, "%s->Call->(Process = %s->PID = %d->TID = %d)->(Process = %s->PID = %d->TID = %d)\n",
-				_KMDFThread_H,
-				lpParnentProc,
-				(int)dwParentPID,
-				(int)dwParentTID,
-				lpCurProc,
-				(int)ProcessId,
-				(int)TId
+			sprintf(msg, "%s->Call->(Process = %s->PID = %u->TID = %u)->(Process = %s->PID = %u->TID = %u)\n", 
+				_KMDFThread_H, 
+				lpParnentProc, 
+				HandleToULong(dwParentPID), 
+				HandleToULong(dwParentTID), 
+				lpCurProc, 
+				HandleToULong(ProcessId), 
+				HandleToULong(TId)
 			);
 			DbgPrint(msg);
 			g_bMainThread = FALSE;
@@ -264,7 +264,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	);
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("%s->IoCreateDevice Failed!\n", _KMDFThread_H);
+		DbgPrint("%s->IoCreateDevice Failed! \n", _KMDFThread_H);
 		return STATUS_SUCCESS;// return ntstatus;
 	}
 	status = IoCreateSymbolicLink(&linkString, &nameString);
@@ -294,7 +294,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	if (!NT_SUCCESS(status))
 	{
 		IoDeleteDevice(DriverObject->DeviceObject);
-		DbgPrint("\n%s->PsSetCreateThreadNotifyRoutine()->Failed!\n", _KMDFThread_H);
+		DbgPrint("\n%s->PsSetCreateThreadNotifyRoutine()->Failed! \n", _KMDFThread_H);
 		return status;
 	}
 

@@ -22,7 +22,7 @@
 #define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)  
 #endif//_KMDFProcessProtector_H
 static size_t s_cf_proc_name_offset = 0;
-PVOID obHandle;//定义一个void*类型的变量，它将会作为 ObRegisterCallbacks 函数的第2个参数。
+PVOID obHandle;//定义一个 void* 类型的变量，它将会作为 ObRegisterCallbacks 函数的第 2 个参数。
 
 
 /** 结构体 **/
@@ -100,6 +100,7 @@ OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_IN
 	{
 		if (pOperationInformation->Operation == OB_OPERATION_HANDLE_CREATE)
 		{
+			DbgPrint("%s->Protected(%wZ)\n", _KMDFProcessProtector_H, &proc_name);
 			if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_TERMINATE) == PROCESS_TERMINATE)
 				pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
 			if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_CREATE_THREAD) == PROCESS_CREATE_THREAD)
@@ -152,7 +153,7 @@ NTSTATUS ProtectProcess(BOOLEAN Enable)
 	return ObRegisterCallbacks(&obReg, &obHandle); //在这里注册回调函数
 }
 
-void cfCurProcNameInit()
+VOID cfCurProcNameInit()
 {
 	ULONG i;
 	PEPROCESS  curproc;
@@ -171,210 +172,7 @@ void cfCurProcNameInit()
 }
 
 
-/** 隐藏保护 **/
-//查找进程
-PEPROCESS FindProcessByName(PWCHAR szName)
-{
-	NTSTATUS ntstatus = STATUS_SUCCESS;
-	PEPROCESS pEprocess = NULL;
-
-	//暴力枚举进程
-	for (size_t i = 4; i < 0x10000000; i += 4)
-	{
-		//获取进程内核结构体
-		ntstatus = PsLookupProcessByProcessId((HANDLE)i, &pEprocess);
-		if (!NT_SUCCESS(ntstatus))
-		{
-			continue;
-		}
-
-		//获取进程路径
-		PUNICODE_STRING ProcessPathName = NULL;
-		ntstatus = SeLocateProcessImageName(pEprocess, &ProcessPathName);
-		if (!NT_SUCCESS(ntstatus) || !ProcessPathName->Length)
-		{
-			continue;
-		}
-
-		//路径转换为大写
-		_wcsupr(ProcessPathName->Buffer);
-		DbgPrint("%ws \r\n", ProcessPathName->Buffer);
-
-		//判断进程名
-		if (wcsstr(ProcessPathName->Buffer, szName) != 0)
-		{
-			ExFreePoolWithTag(ProcessPathName, 0);
-			return pEprocess;
-		}
-
-		ExFreePoolWithTag(ProcessPathName, 0);
-	}
-
-	return NULL;
-}
-
-//获取进程结构体链表偏移
-ULONG GetActiveListOffset()//PEPROCESS pEprocess
-{
-	UNICODE_STRING FunName = { 0 };
-	RtlInitUnicodeString(&FunName, L"PsGetProcessId");
-
-	/* 获取函数地址 */
-	PUCHAR pFun = (PUCHAR)MmGetSystemRoutineAddress(&FunName);
-	if (pFun)
-	{
-		for (size_t i = 0; i < 0x100; i++)
-		{
-			//获取UniqueProcessId偏移2
-			if (pFun[i] == 0x8B && pFun[i + 1] == 0x80)
-			{
-				//UniqueProcessId + 4为ActiveProcessLinks
-				return *(PULONG)(pFun + i + 2) + 4;
-			}
-		}
-	}
-
-	return 0;
-
-}
-
-/* 隐藏进程 */
-NTSTATUS HideProcess(PWCHAR szName)
-{
-	/* 查找进程 */
-	PEPROCESS pEprocess = FindProcessByName(szName);
-	if (!pEprocess)
-		return STATUS_NOT_FOUND;
-
-	/* 获取链表偏移 */
-	ULONG uOffset = GetActiveListOffset(pEprocess);
-	if (!uOffset)
-		return STATUS_INVALID_LDT_OFFSET;
-
-	/* 断链 */
-	RemoveEntryList((PUCHAR)pEprocess + uOffset);
-	return STATUS_SUCCESS;
-}
-
-
-ULONG find_eprocess_pid_offset()
-{
-
-	ULONG pid_ofs = 0;		// The offset we are looking for
-	PEPROCESS eprocs;		// Process list
-	PsLookupProcessByProcessId((HANDLE)10196, &eprocs);
-
-	/*
-	Go through the EPROCESS structure and look for the PID
-	we can start at 0x20 because UniqueProcessId should
-	not be in the first 0x20 bytes,
-	also we should stop after 0x300 bytes with no success
-	*/
-	for (int i = 0x20; i < 0x300; i += 4)
-		if (*(ULONG*)((UCHAR*)eprocs + i) == 10196)
-		{
-			pid_ofs = i;
-			break;
-		}
-
-	ObDereferenceObject(eprocs);
-	return pid_ofs;
-}
-
-VOID remove_links(PLIST_ENTRY Current)
-{
-	DbgPrint("%s->remove_links->Begin\n", _KMDFProcessProtector_H);
-	PLIST_ENTRY Previous, Next;
-
-	Previous = (Current->Blink);
-	Next = (Current->Flink);
-
-	// Loop over self (connect previous with next)
-	Previous->Flink = Next;
-	Next->Blink = Previous;
-
-	// Re-write the current LIST_ENTRY to point to itself (avoiding BSOD)
-	Current->Blink = (PLIST_ENTRY)&Current->Flink;
-	Current->Flink = (PLIST_ENTRY)&Current->Flink;
-	DbgPrint("%s->remove_links->End\n", _KMDFProcessProtector_H);
-	return;
-}
-
-NTSTATUS HiddenProcess(UINT32 pid)
-{
-	DbgPrint("%s->Hidden(%lu)->Begin\n", _KMDFProcessProtector_H, pid);
-	LPSTR result = ExAllocatePool2(NonPagedPool, sizeof(ULONG) + 20, 'tPrP');// Tag 阅读顺序是反的
-	if (NULL == result)//申请失败则尝试适配 Win 10 2004 及以前的版本
-		result = ExAllocatePoolZero(NonPagedPool, sizeof(ULONG) + 20, 'tPrP');// Tag 阅读顺序是反的
-	if (NULL == result)
-	{
-		DbgPrint("%s->HiddenProtection->%s\n", _KMDFProcessProtector_H, "ExAllocatePool failed! ");
-		return STATUS_MEMORY_NOT_ALLOCATED;
-	}
-
-	// Get PID offset nt!_EPROCESS.UniqueProcessId
-	ULONG PID_OFFSET = find_eprocess_pid_offset();
-
-	// Check if offset discovery was successful 
-	if (0 == PID_OFFSET)
-	{
-		DbgPrint("%s->HiddenProtection->%s\n", _KMDFProcessProtector_H, "Could not find PID offset! ");
-		return STATUS_NOT_FOUND;
-	}
-
-	// Get LIST_ENTRY offset nt!_EPROCESS.ActiveProcessLinks
-	ULONG LIST_OFFSET = PID_OFFSET;
-
-	// Check Architecture using pointer size
-	INT_PTR ptr;
-
-	// Ptr size 8 if compiled for a 64-bit machine, 4 if compiled for 32-bit machine
-	LIST_OFFSET += sizeof(ptr);
-
-	// Record offsets for user buffer
-	//DbgPrint("%s->HiddenProcess: result = %s, size = %lu, offsets = %lu & %lu", _KMDFProcessProtector_H, result, (sizeof(ULONG) << 1) + 30, PID_OFFSET, LIST_OFFSET);
-
-	// Get current process
-	PEPROCESS CurrentEPROCESS = PsGetCurrentProcess();
-
-	// Initialize other variables
-	PLIST_ENTRY CurrentList = (PLIST_ENTRY)((ULONG_PTR)CurrentEPROCESS + LIST_OFFSET);
-	PUINT32 CurrentPID = (PUINT32)((ULONG_PTR)CurrentEPROCESS + PID_OFFSET);
-
-	// Check self 
-	if (*(UINT32*)CurrentPID == pid)
-	{
-		remove_links(CurrentList);
-		return STATUS_SUCCESS;
-	}
-
-	// Record the starting position
-	PEPROCESS StartProcess = CurrentEPROCESS;
-
-	// Move to next item
-	CurrentEPROCESS = (PEPROCESS)((ULONG_PTR)CurrentList->Flink - LIST_OFFSET);
-	CurrentPID = (PUINT32)((ULONG_PTR)CurrentEPROCESS + PID_OFFSET);
-	CurrentList = (PLIST_ENTRY)((ULONG_PTR)CurrentEPROCESS + LIST_OFFSET);
-
-	// Loop until we find the right process to remove
-	// Or until we circle back
-	while ((ULONG_PTR)StartProcess != (ULONG_PTR)CurrentEPROCESS)
-	{
-		// Check item
-		if (*(UINT32*)CurrentPID == pid)
-		{
-			remove_links(CurrentList);
-			return STATUS_SUCCESS;
-		}
-
-		// Move to next item
-		CurrentEPROCESS = (PEPROCESS)((ULONG_PTR)CurrentList->Flink - LIST_OFFSET);
-		CurrentPID = (PUINT32)((ULONG_PTR)CurrentEPROCESS + PID_OFFSET);
-		CurrentList = (PLIST_ENTRY)((ULONG_PTR)CurrentEPROCESS + LIST_OFFSET);
-	}
-	DbgPrint("%s->Hidden(%lu)->End\n", _KMDFProcessProtector_H, pid);
-	return STATUS_SUCCESS;
-}
+/** 隐藏保护函数 **/
 
 
 
@@ -485,6 +283,7 @@ VOID DriverUnload(IN PDRIVER_OBJECT pDriverObj)
 	return;
 }
 
+/* 驱动入口 */
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObj, IN PUNICODE_STRING pRegistryString)
 {
 	UNREFERENCED_PARAMETER(pRegistryString);
@@ -539,12 +338,10 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObj, IN PUNICODE_STRING pRegistryS
 
 	DbgPrint("%s->Trying to start protection. \n", _KMDFProcessProtector_H);
 	cfCurProcNameInit();
-	PLDR_DATA_TABLE_ENTRY ldr;
-	ldr = (PLDR_DATA_TABLE_ENTRY)pDriverObj->DriverSection;
+	PLDR_DATA_TABLE_ENTRY ldr = (PLDR_DATA_TABLE_ENTRY)pDriverObj->DriverSection;
 	ldr->Flags |= 0x20;
 	status[1] = ProtectProcess(TRUE);
-	//status[2] = HiddenProcess((ULONG)10196);
-	status[2] = HideProcess(L"NOTEPAD.EXE");
+	status[2];// = HideProcess((PUCHAR)"notepad.exe");
 	DbgPrint("%s->Protection Start! \n", _KMDFProcessProtector_H);
 	DbgPrint("%s->Device = 0x%x\n", _KMDFProcessProtector_H, status[0]);
 	DbgPrint("%s->Self-Protection = 0x%x\n", _KMDFProcessProtector_H, status[1]);

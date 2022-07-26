@@ -1,6 +1,5 @@
 #include "ntddk.h"
 #include "ntddkbd.h"
-#include "stdio.h"        
 
 #define KEY_UP        1
 #define KEY_DOWN      0  
@@ -26,7 +25,6 @@ VOID DriverUnload(PDRIVER_OBJECT driver)
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
 	UNREFERENCED_PARAMETER(RegistryPath);//ÊÖ¶¯ÐÑÄ¿
-	CCHAR         ntNameBuffer[64];
 	STRING         ntNameString;
 	UNICODE_STRING      ntUnicodeString = { 256,256 };
 	NTSTATUS            status;
@@ -39,8 +37,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 		DriverObject->MajorFunction[IRP_MJ_CLEANUP] =
 		DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = KSnifferDispatchGeneral;
 
-	sprintf(ntNameBuffer, "\\Device\\KeyboardClass0");
-	RtlInitAnsiString(&ntNameString, ntNameBuffer);
+	RtlInitAnsiString(&ntNameString, "\\Device\\KeyboardClass0");
 	RtlAnsiStringToUnicodeString(&ntUnicodeString, &ntNameString, TRUE);
 
 	status = IoCreateDevice(DriverObject,

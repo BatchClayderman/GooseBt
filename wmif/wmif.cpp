@@ -75,7 +75,7 @@ EXTERN_C BOOL GetFilePathFromHandleA(HANDLE hFile, LPSTR  lpszPath, UINT cchMax)
 #ifndef DriverConnection_H
 #define DriverConnection_H
 #ifndef CTL_CODE
-#define CTL_CODE(DeviceType, Function, Method, Access) (  ((DeviceType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method))
+#define CTL_CODE(DeviceType, Function, Method, Access) (((DeviceType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method))
 #endif
 #ifdef CWK_DEV_SYM_P//重要
 #undef CWK_DEV_SYM_P
@@ -491,7 +491,7 @@ BOOL FindFileHandle(LPCTSTR lpName, vector<ncFileHandle>& handles)// FindFileHan
 {
 	handles.clear();
 
-	if (lpName == NULL)
+	if (NULL == lpName)
 		return FALSE;
 
 	/* 打开“NUL”文件以便后续获取文件句柄类型值 */
@@ -508,13 +508,11 @@ BOOL FindFileHandle(LPCTSTR lpName, vector<ncFileHandle>& handles)// FindFileHan
 	BYTE nFileType = 0;
 	DWORD dwCrtPid = GetCurrentProcessId();
 	for (DWORD i = 0; i < pshi->dwCount; ++i)
-	{
 		if (pshi->Handles[i].dwProcessId == dwCrtPid && hTempFile == (HANDLE)pshi->Handles[i].wValue)
 		{
 			nFileType = pshi->Handles[i].bObjectType;
 			break;
 		}
-	}
 
 	HANDLE hCrtProc = GetCurrentProcess();
 	for (DWORD i = 0; i < pshi->dwCount; ++i)
@@ -526,10 +524,13 @@ BOOL FindFileHandle(LPCTSTR lpName, vector<ncFileHandle>& handles)// FindFileHan
 		/* 将上述句柄复制到当前进程中 */
 		ncScopedHandle handle = NULL;
 		ncScopedHandle hProc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, pshi->Handles[i].dwProcessId);
-		if (hProc == NULL || !DuplicateHandle(
+		if (NULL == hProc
+			|| !DuplicateHandle(
 			hProc, (HANDLE)pshi->Handles[i].wValue,
 			hCrtProc, &handle, 0,
-			FALSE, DUPLICATE_SAME_ACCESS))
+			FALSE, DUPLICATE_SAME_ACCESS
+			)
+		)
 			continue;
 
 		/* 过滤掉会导致 NtQueryObject 卡死的句柄（如管道等） */
@@ -673,22 +674,36 @@ int DriverConnector(_TCHAR* msg, const _TCHAR* PipeName)
 
 
 
+/* 帮助 */
+void showHelp()
+{
+	wcout << endl << L"描述：综合文件管理器。" << endl;
+	wcout << endl << L"wmif [首参数] [文件路径]" << endl << endl;
+	wcout << L"可用首参数列表：" << endl;
+	wcout << L"\tshowlock\t查询文件占用情况" << endl;
+	wcout << L"\tunlock\t\t解锁文件" << endl;
+	wcout << L"\tsmash\t\t粉碎文件" << endl;
+	wcout << L"\tKMDFProtect\t驱动保护（占用文件法）" << endl << endl;
+	return;
+}
+
+
 /* 遵循 Microsoft Windows 命令行规则的 main 函数 */
 int _tmain(int argc, _TCHAR* argv[])
 {
 	setlocale(LC_CTYPE, "");
-	wcout.imbue(locale("chs"));
+	wcout.imbue(locale("chs", LC_CTYPE));
 	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);//更改优先级
 	SetProcessPriorityBoost(GetCurrentProcess(), FALSE);//锁定优先级
 	if (::IsWow64())//关闭重定向
 		::WOW64FsDir(TRUE);
 
-	if (argc >= 3)
+	if (argc >= 3)//参数数量正确
 	{
-		if (_wcsicmp(argv[1], L"showlock") == 0
-			|| _wcsicmp(argv[1], L"unlock") == 0
-			|| _wcsicmp(argv[1], L"smash") == 0
-			)
+		if (0 == _wcsicmp(argv[1], L"showlock")
+			|| 0 == _wcsicmp(argv[1], L"unlock")
+			|| 0 == _wcsicmp(argv[1], L"smash")
+		)//攻击类
 		{
 			LoopOptions
 			{
@@ -699,51 +714,72 @@ int _tmain(int argc, _TCHAR* argv[])
 					wcout << L"文件“" << argv[i] << L"”不存在，无需执行进一步操作！" << endl;
 					continue;
 				}
-				if (!FindFileHandle(path.c_str(), vecHandles))
-					wcout << L"查询文件“" << argv[i] << L"”锁定信息失败，无法执行进一步操作！" << endl;
-				else
+				if (0 == _wcsicmp(argv[1], L"smash"))//驱删
+					DriverConnector(argv[i], CWK_DEV_SYM_S);
+				else//不涉及驱动的其它操作
 				{
-					if (vecHandles.size() <= 0)
+					if (!FindFileHandle(path.c_str(), vecHandles))
+						wcout << L"查询文件“" << argv[i] << L"”锁定信息失败，无法执行进一步操作！" << endl;
+					else
 					{
-						wcout << L"文件“" << argv[i] << L"”未被锁定，无需解除占用。" << endl;
-						continue;
-					}
-					wcout << endl << L"->\"" << argv[i] << L"\"" << endl;
-					if (_wcsicmp(argv[1], L"smash") == 0)
-					{
-						LoopHandles
+						if (0 == _wcsicmp(argv[1], L"unlock"))
 						{
-							wcout << L"\t" << vecHandles[j]._path.c_str() << endl;
-							CloseHandleEx((HANDLE)vecHandles[j]._handle.wValue, vecHandles[j]._handle.dwProcessId);
-							DriverConnector(argv[i], CWK_DEV_SYM_S);
+							if (vecHandles.size() > 0)
+							{
+								wcout << L"文件“" << argv[i] << L"”共有 " << vecHandles.size() << L" 个文件句柄。" << endl;
+								LoopHandles
+								{
+									wcout << L"[" << j << L"]\t0x" << vecHandles[j]._handle.pAddress << L"\t" << vecHandles[j]._handle.dwProcessId << L"\t\"" << vecHandles[j]._path.c_str() << L"\"" << endl;
+									CloseHandleEx((HANDLE)vecHandles[j]._handle.wValue, vecHandles[j]._handle.dwProcessId);
+								}
+							}
+							else
+								wcout << L"文件“" << argv[i] << L"”未被锁定，无需解除占用。" << endl;
+						}
+						else if (0 == _wcsicmp(argv[1], L"showlock"))
+						{
+							if (vecHandles.size() > 0)
+							{
+								wcout << L"文件“" << argv[i] << L"”共有 " << vecHandles.size() << L" 个文件句柄。" << endl;
+								LoopHandles
+									wcout << L"[" << j << L"]\t0x" << vecHandles[j]._handle.pAddress << L"\t" << vecHandles[j]._handle.dwProcessId << L"\t\"" << vecHandles[j]._path.c_str() << L"\"" << endl;
+							}
+							else
+								wcout << L"文件“" << argv[i] << L"”未被锁定。" << endl;
 						}
 					}
-					else if (_wcsicmp(argv[1], L"unlock") == 0)
-						LoopHandles
-						{
-							wcout << L"\t" << vecHandles[j]._path.c_str() << endl;
-							CloseHandleEx((HANDLE)vecHandles[j]._handle.wValue, vecHandles[j]._handle.dwProcessId);
-						}
-					else//不需要解锁
-						LoopHandles
-							wcout << L"\t" << vecHandles[j]._path.c_str() << endl;
-					wcout << endl;
 				}
-			}	
+				wcout << endl;
+			}
 			return EXIT_SUCCESS;
 		}
-		else if (_wcsicmp(argv[1], L"KMDFProtect") == 0)
+		else if (0 == _wcsicmp(argv[1], L"KMDFProtect"))//防护类
 		{
 			LoopOptions
 				DriverConnector(argv[i], CWK_DEV_SYM_P);
 			return EXIT_SUCCESS;
 		}
-		wcout << L"\a错误：命令行参数不正确！" << endl;
-		return EOF;
+		else
+		{
+			wcout << L"\a错误：命令行参数不正确！" << endl;
+			return EOF;
+		}
+	}
+	else if (1 == argc
+		|| (2 == argc
+			&& (
+				0 == _wcsicmp(argv[1], L"/?") || 0 == _wcsicmp(argv[1], L"-?")
+				|| 0 == _wcsicmp(argv[1], L"/help") || 0 == _wcsicmp(argv[1], L"-help")
+			)
+		)
+	)//帮助类
+	{
+		showHelp();
+		return EXIT_SUCCESS;
 	}
 	else
 	{
-		wcout << L"\a错误：命令行参数太少！" << endl;
+		wcout << L"\a错误：命令行参数不正确！" << endl;
 		return EOF;
 	}
 }

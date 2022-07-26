@@ -61,39 +61,35 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 		{
 			/* 处理 DeviceIoControl */
 			PVOID buffer = irp->AssociatedIrp.SystemBuffer;//缓冲区地址
-			//ULONG inlen = irpsp->Parameters.DeviceIoControl.InputBufferLength;//输入缓冲区长度
-			//ULONG outlen = irpsp->Parameters.DeviceIoControl.OutputBufferLength;//输出缓冲区长度
+			ULONG inlen = irpsp->Parameters.DeviceIoControl.InputBufferLength;//输入缓冲区长度
+			ULONG outlen = irpsp->Parameters.DeviceIoControl.OutputBufferLength;//输出缓冲区长度
 
 			/* 根据前面定义好的设备请求功能号，详细判断输入还是输出，我们在这里只判断输入 */
 			switch (irpsp->Parameters.DeviceIoControl.IoControlCode)
 			{
 			case CWK_DVC_SEND_STR:
-				ASSERT(buffer != NULL);
-				ASSERT(inlen > 0);
-				ASSERT(outlen == 0);
+				ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen);
+				if (NULL == buffer || inlen >= MAX_PATH || inlen <= 0 || 0 != outlen)
+				{
+					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)", _ZwTerminateProcess_H);
+					break;
+				}
 				short int choice = 0;//请求方案
 				char bufIN[MAX_PATH] = { 0 };
 				DWORD pid = 0;//目标 PID
 				DWORD* pointer;
 				pointer = &pid;
 				strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), (char*)buffer);
-				DbgPrint(_ZwTerminateProcess_H);
-				DbgPrint("->GetwmipMsg()->");
+				DbgPrint("%s->GetwmipMsg()->", _ZwTerminateProcess_H);
 				if (strlen(bufIN) == 3//防止出错
 					&& (bufIN[0] == '/' || bufIN[0] == '-')
 					&& (bufIN[1] == 'D' || bufIN[1] == 'd')
 					&& (bufIN[2] == 'R' || bufIN[2] == 'r')
 					)// /dr 指令
 				{
-					DbgPrint("DrivenReboot()");
-#if (defined _WIN64 || defined WIN64)
-					DbgPrint("->x86 Only!\n");
-					return STATUS_ABANDONED;
-#else
-					DbgPrint("\n");
+					DbgPrint("DrivenReboot()\n");
 					DrivenReboot();
 					return STATUS_SUCCESS;
-#endif
 				}
 				else if (strlen(bufIN) == 3//防止出错
 					&& (bufIN[0] == '/' || bufIN[0] == '-')
@@ -147,7 +143,7 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 						DbgPrint("ZwTerminateProcessByPID(%s)", bufIN);
 					}
 					else
-						DbgPrint("\"%s\"", bufIN);//充当无效指令
+						DbgPrint("UnknownMsg->\"%s\"", bufIN);//充当无效指令
 				}
 				else if (strlen(bufIN) == 4//直接指定
 					&& (bufIN[0] == '/' || bufIN[0] == '-')
@@ -160,7 +156,7 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 					DbgPrint("ZwTerminateAll()");
 				}
 				else
-					DbgPrint("\"%s\"", bufIN);//无效指令充当接收信息
+					DbgPrint("UnknownMsg->\"%s\"", bufIN);//无效指令充当接收信息
 				DbgPrint("\n");
 				switch (choice)
 				{

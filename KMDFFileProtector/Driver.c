@@ -20,28 +20,29 @@ BOOLEAN NtOccurFile(UNICODE_STRING uPathName)
 	OBJECT_ATTRIBUTES objAttri = { 0 };
 	NTSTATUS ntStaus;
 	IO_STATUS_BLOCK ioStatus = { 0 };
-	InitializeObjectAttributes(&objAttri,//打开文件
+	InitializeObjectAttributes(&objAttri, //打开文件
 		&uPathName,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		0);
+		0
+	);
 	ntStaus = ZwOpenFile(&hFile[hNum],
 		FILE_READ_ACCESS,
 		&objAttri,
 		&ioStatus,
 		FILE_ATTRIBUTE_NORMAL,
-		0);
-	DbgPrint(_KMDFFileProtector_H);
-	DbgPrint("->NtOccurFile(%ws)->", (wchar_t*)uPathName.Buffer);
+		0
+	);
+	
 	if (NT_SUCCESS(ntStaus))
 	{
-		DbgPrint("Successful!\n");
+		DbgPrint("%s->NtOccurFile(\"%ws\")->Successful! \n", _KMDFFileProtector_H, (wchar_t*)uPathName.Buffer);
 		++hNum;
 		return TRUE;
 	}
 	else
 	{
-		DbgPrint("Failed!\n");
+		DbgPrint("%s->NtOccurFile(\"%ws\")->Failed! \n", _KMDFFileProtector_H, (wchar_t*)uPathName.Buffer);
 		return FALSE;
 	}
 }
@@ -55,9 +56,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 	for (; hNum >= 0; --hNum)
 		ZwClose(hFile[hNum]);
 	listenerUnload();
-	DbgPrint("\n");
-	DbgPrint(_KMDFFileProtector_H);
-	DbgPrint("->DriverUnload()\n");
+	DbgPrint("\n%s->DriverUnload()\n", _KMDFFileProtector_H);
 	return;
 }
 
@@ -65,9 +64,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 {
 	UNREFERENCED_PARAMETER(pPath);
-	DbgPrint("\n");
-	DbgPrint(_KMDFFileProtector_H);
-	DbgPrint("->DriverEntry()\n");
+	DbgPrint("\n%s->DriverEntry()\n", _KMDFFileProtector_H);
 	NTSTATUS bRet = listenerEntry(pDriver);
 	if (!NT_SUCCESS(bRet))
 		return bRet;

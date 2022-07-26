@@ -33,7 +33,8 @@ NTSTATUS IBinaryNtCreateFile(UNICODE_STRING ustr)//创建文件
 		&ustr,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		NULL);
+		NULL
+	);
 	NtStatus = ZwCreateFile(&hFile,
 		GENERIC_WRITE,
 		&ObjAttus,
@@ -44,7 +45,8 @@ NTSTATUS IBinaryNtCreateFile(UNICODE_STRING ustr)//创建文件
 		FILE_OPEN_IF,
 		FILE_SYNCHRONOUS_IO_ALERT | FILE_NON_DIRECTORY_FILE,
 		NULL,
-		0);
+		0
+	);
 	if (NT_SUCCESS(NtStatus))
 		ZwClose(hFile);
 	return NtStatus;
@@ -68,7 +70,8 @@ NTSTATUS IBinaryNtCreateDirectory(UNICODE_STRING uPathName)//创建目录
 		&uPathName,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		NULL);
+		NULL
+	);
 	ntStatus = ZwCreateFile(&hFile,
 		GENERIC_READ | GENERIC_WRITE,
 		&objAttus,
@@ -79,10 +82,116 @@ NTSTATUS IBinaryNtCreateDirectory(UNICODE_STRING uPathName)//创建目录
 		FILE_OPEN_IF,
 		FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,//表示创建的是目录并且是同步执行
 		NULL,
-		0);
+		0
+	);
 	if (NT_SUCCESS(ntStatus))
 		ZwClose(hFile);
 	return ntStatus;
+}
+
+/* 文件解锁 */
+NTSTATUS NTAPI ZwQuerySystemInformation(IN size_t SystemInformationClass,
+	OUT PVOID SystemInformation,
+	IN ULONG SystemInformationLength,
+	OUT PULONG ReturnLength OPTIONAL
+);
+POBJECT_TYPE NTAPI ObGetObjectType(_In_ PVOID Object);
+
+typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO
+{
+	USHORT UniqueProcessId;
+	USHORT CreatorBackTraceIndex;
+	UCHAR ObjectTypeIndex;
+	UCHAR HandleAttributes;
+	USHORT HandleValue;
+	PVOID Object;
+	ULONG GrantedAccess;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO, * PSYSTEM_HANDLE_TABLE_ENTRY_INFO;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION
+{
+	ULONG NumberOfHandles;
+	SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+} SYSTEM_HANDLE_INFORMATION, * PSYSTEM_HANDLE_INFORMATION;
+
+NTSTATUS preAttachProcess(size_t pid, HANDLE hdle)
+{
+	PEPROCESS m_process;
+	KAPC_STATE* m_apc_state;
+
+	NTSTATUS psLookupStatus = PsLookupProcessByProcessId((PVOID)pid, &m_process);
+	if (!NT_SUCCESS(psLookupStatus))
+		return psLookupStatus;
+
+	m_apc_state = (KAPC_STATE*)ExAllocatePool2(NonPagedPool, sizeof(KAPC_STATE), 'klnu');
+	if (NULL == m_apc_state)
+		m_apc_state = (KAPC_STATE*)ExAllocatePoolZero(NonPagedPool, sizeof(KAPC_STATE), 'klnu');
+	if (NULL == m_apc_state)
+		return STATUS_MEMORY_NOT_ALLOCATED;
+
+	KeStackAttachProcess(m_process, m_apc_state);
+	NtClose(hdle);
+	if (NULL != m_process)
+	{
+		ObDereferenceObject(m_process);
+		KeUnstackDetachProcess(m_apc_state);
+		ExFreePool(m_apc_state);
+	}
+
+	return STATUS_SUCCESS;
+}
+
+SYSTEM_HANDLE_INFORMATION* get_all_handles()
+{
+	size_t handles_allocation_size = 0;
+	PVOID handles_pool = NULL;
+
+	for (;;)
+	{
+		handles_allocation_size += 0x10000;
+		handles_pool = ExAllocatePool2(PagedPool, handles_allocation_size, 'dhag');
+		if (NULL == handles_pool)
+			handles_pool = ExAllocatePoolZero(PagedPool, handles_allocation_size, 'dhag');
+		if (NULL == handles_pool)
+			break;
+
+		NTSTATUS status = ZwQuerySystemInformation(0x10, handles_pool, (ULONG)handles_allocation_size, NULL);
+		if (STATUS_INFO_LENGTH_MISMATCH == status)
+			ExFreePool(handles_pool);
+		else
+			break;
+	}
+	return (SYSTEM_HANDLE_INFORMATION*)handles_pool;
+}
+
+NTSTATUS close_all_file_handles(const wchar_t* file_path)
+{
+	BOOLEAN flag = TRUE;
+	PSYSTEM_HANDLE_INFORMATION all_system_handles = get_all_handles();
+	for (size_t i = 0; i < all_system_handles->NumberOfHandles; ++i)
+	{
+		SYSTEM_HANDLE_TABLE_ENTRY_INFO handle_info = all_system_handles->Handles[i];
+		if (*IoFileObjectType == ObGetObjectType(handle_info.Object))
+		{
+			POBJECT_NAME_INFORMATION object_name_information;
+			NTSTATUS status = IoQueryFileDosDeviceName((PFILE_OBJECT)handle_info.Object, &object_name_information);
+			if (!NT_SUCCESS(status))//不是所有程序都有文件句柄
+				continue;
+			if (0 == wcscmp(file_path, object_name_information->Name.Buffer))
+				if (!NT_SUCCESS(preAttachProcess(handle_info.UniqueProcessId, (HANDLE)handle_info.HandleValue)))
+				{
+					flag = FALSE;
+					continue;
+				}
+			ExFreePool(object_name_information);
+		}
+	}
+	ExFreePool(all_system_handles);
+	if (flag)
+		DbgPrint("%s->Unlock(\"%ws\")->Successful! \n", _ZwDeleteFile_H, file_path);
+	else
+		DbgPrint("%s->Unlock(\"%ws\")->Failed! \n", _ZwDeleteFile_H, file_path);
+	return STATUS_SUCCESS;
 }
 
 /* 文件读写 */
@@ -114,7 +223,8 @@ NTSTATUS IBinaryNtReadFile(PVOID pszBuffer, UNICODE_STRING uPathName)//读取文件
 		&uPathName,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		0);
+		0
+	);
 	ntStaus = ZwCreateFile(&hFile,
 		GENERIC_READ | GENERIC_WRITE,
 		&objAttri,
@@ -125,15 +235,16 @@ NTSTATUS IBinaryNtReadFile(PVOID pszBuffer, UNICODE_STRING uPathName)//读取文件
 		FILE_OPEN,
 		FILE_SYNCHRONOUS_IO_NONALERT,
 		NULL,
-		0);
+		0
+	);
 	if (!NT_SUCCESS(ntStaus))
 	{
 		ZwClose(hFile);
 		if (NULL != pReadBuffer)
-			ExFreePoolWithTag(pReadBuffer, (ULONG)"niBI");
+			ExFreePoolWithTag(pReadBuffer, 'niBI');
 		return STATUS_INTEGER_DIVIDE_BY_ZERO;
 	}
-	pReadBuffer = ExAllocatePoolWithTag(PagedPool, 100, (ULONG)"niBI");//读取文件
+	pReadBuffer = ExAllocatePool2(PagedPool, 100, 'niBI');//读取文件//ExAllocatePoolWithTag(PagedPool, 100, 'niBI');//读取文件
 	if (NULL == pReadBuffer)
 		return STATUS_INTEGER_DIVIDE_BY_ZERO;
 	ntStaus = ZwReadFile(hFile, NULL, NULL, NULL, &ioStatus, pReadBuffer, 100, NULL, NULL);
@@ -141,13 +252,13 @@ NTSTATUS IBinaryNtReadFile(PVOID pszBuffer, UNICODE_STRING uPathName)//读取文件
 	{
 		ZwClose(hFile);
 		if (NULL != pReadBuffer)
-			ExFreePoolWithTag(pReadBuffer, (ULONG)"niBI");
+			ExFreePoolWithTag(pReadBuffer, 'niBI');
 		return STATUS_INTEGER_DIVIDE_BY_ZERO;
 	}
 	RtlCopyMemory(pszBuffer, pReadBuffer, 100);//将读取的内容拷贝到传入的缓冲区.
 	ZwClose(hFile);//记得关闭文件
 	if (NULL != pReadBuffer)
-		ExFreePoolWithTag(pReadBuffer, (ULONG)"niBI");
+		ExFreePoolWithTag(pReadBuffer, 'niBI');
 	return ntStaus;
 }
 
@@ -163,7 +274,8 @@ NTSTATUS IBinaryNtWriteFile(UNICODE_STRING uPathName)//写文件
 		&uPathName,
 		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
 		NULL,
-		0);
+		0
+	);
 	ntStatus = ZwCreateFile(&hFile,
 		GENERIC_WRITE | GENERIC_WRITE,
 		&objAttri,
@@ -174,14 +286,14 @@ NTSTATUS IBinaryNtWriteFile(UNICODE_STRING uPathName)//写文件
 		FILE_OPEN,//注意此标志——打开文件文件不存在则失败
 		FILE_SYNCHRONOUS_IO_NONALERT,
 		NULL,
-		0);
+		0
+	);
 	if (!NT_SUCCESS(ntStatus))
 		return ntStatus;
-	pWriteBuffer = ExAllocatePoolWithTag(PagedPool, 0x20, (ULONG)"niBI");//开始写文件
-	if (pWriteBuffer == NULL)
+	pWriteBuffer = ExAllocatePool2(PagedPool, 0x20, 'niBI');//开始写文件//ExAllocatePoolWithTag(PagedPool, 0x20, 'niBI');//开始写文件
+	if (NULL == pWriteBuffer)
 	{
-		DbgPrint(_ZwDeleteFile_H);
-		DbgPrint("->IBinaryNtWriteFile(%wZ)->Memory Error!\n", uPathName);
+		DbgPrint("%s->IBinaryNtWriteFile(%wZ)->Memory Error! \n", _ZwDeleteFile_H, uPathName);
 		ZwClose(hFile);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -195,14 +307,15 @@ NTSTATUS IBinaryNtWriteFile(UNICODE_STRING uPathName)//写文件
 		pWriteBuffer,
 		0x20,
 		NULL,
-		NULL);
+		NULL
+	);
 	if (!NT_SUCCESS(ntStatus))
 	{
 		ZwClose(hFile);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 	ZwClose(hFile);
-	ExFreePoolWithTag(pWriteBuffer, (ULONG)"niBI");
+	ExFreePoolWithTag(pWriteBuffer, 'niBI');
 	return ntStatus;
 }
 
@@ -217,8 +330,10 @@ NTSTATUS IBinaryNtZwDeleteFile(UNICODE_STRING uDeletePathName)//直接驱动级文件删
 		NULL
 	);
 	NTSTATUS bRet = ZwDeleteFile(&obAttri);
-	DbgPrint(_ZwDeleteFile_H);
-	DbgPrint((NT_SUCCESS(bRet) ? "->IBinaryNtZwDeleteFile(%wZ)->Successful!\n" : "->IBinaryNtZwDeleteFile(%wZ)->Failed!\n"), &uDeletePathName);
+	if (NT_SUCCESS(bRet))
+		DbgPrint("%s->IBinaryNtZwDeleteFile(\"%wZ\")->Successful! \n", _ZwDeleteFile_H, &uDeletePathName);
+	else
+		DbgPrint("%s->IBinaryNtZwDeleteFile(\"%wZ\")->Failed(%d)! \n", _ZwDeleteFile_H, &uDeletePathName, bRet);
 	return bRet;
 }
 
@@ -284,22 +399,17 @@ NTSTATUS IBinaryNtSetInformationFileDeleteFile(UNICODE_STRING uDeletePathName)//
 						FileBasicInformation
 					);
 					if (!NT_SUCCESS(ntStatus))//遍历文件信息失败
-					{
-						DbgPrint(_ZwDeleteFile_H);
-						DbgPrint("->IBinaryNtSetInformationFileDeleteFile(%wZ)->GetFileBasicInformation Failed!\n", &uDeletePathName);
-					}
+						DbgPrint("%s->IBinaryNtSetInformationFileDeleteFile(\"%wZ\")->GetFileBasicInformation Failed(%d)! \n", _ZwDeleteFile_H, &uDeletePathName, ntStatus);
 					IBFileBasic.FileAttributes = FILE_ATTRIBUTE_NORMAL; //设置属性为默认属性
 					ntStatus = ZwSetInformationFile(
 						hFile,
 						&ioStatus,
 						&IBFileBasic,
 						sizeof(IBFileBasic),
-						FileBasicInformation);//将我的 FileBasic 基本属性设置到这个文件中
+						FileBasicInformation
+					);//将我的 FileBasic 基本属性设置到这个文件中
 					if (!NT_SUCCESS(ntStatus))
-					{
-						DbgPrint(_ZwDeleteFile_H);
-						DbgPrint("->IBinaryNtSetInformationFileDeleteFile(%wZ)->SetFileBasicInformation Failed!\n", &uDeletePathName);
-					}
+						DbgPrint("%s->IBinaryNtSetInformationFileDeleteFile(\"%wZ\")->SetFileBasicInformation Failed(%d)! \n", _ZwDeleteFile_H, &uDeletePathName, ntStatus);
 					
 					ZwClose(hFile);//如果成功关闭文件句柄
 					ntStatus = ZwCreateFile(&hFile,//重新打开这个设置信息后的文件.
@@ -312,13 +422,11 @@ NTSTATUS IBinaryNtSetInformationFileDeleteFile(UNICODE_STRING uDeletePathName)//
 						FILE_OPEN,
 						FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
 						NULL,
-						0);
+						0
+					);
 				}
 				if (!NT_SUCCESS(ntStatus))
-				{
-					DbgPrint(_ZwDeleteFile_H);
-					DbgPrint("->IBinaryNtSetInformationFileDeleteFile(%wZ)->Error Opening File!\n", &uDeletePathName);
-				}
+					DbgPrint("%s->IBinaryNtSetInformationFileDeleteFile(\"%wZ\")->Error Opening File(%d)! \n", _ZwDeleteFile_H, &uDeletePathName, ntStatus);
 			}
 		}
 		
@@ -328,19 +436,23 @@ NTSTATUS IBinaryNtSetInformationFileDeleteFile(UNICODE_STRING uDeletePathName)//
 		if (!NT_SUCCESS(ntStatus))
 		{
 			ZwClose(hFile);
-			DbgPrint(_ZwDeleteFile_H);
-			DbgPrint("->IBinaryNtSetInformationFileDeleteFile(%wZ)->SetFileInformation Failed!\n", &uDeletePathName);
+			DbgPrint("%s->IBinaryNtSetInformationFileDeleteFile(\"%wZ\")->SetFileInformation Failed(%d)! \n", _ZwDeleteFile_H, &uDeletePathName, ntStatus);
 			return ntStatus;
 		}
 		ZwClose(hFile);
 	}
 	__except (1)
 	{
-		DbgPrint(_ZwDeleteFile_H);
-		DbgPrint("->IBinaryNtSetInformationFileDeleteFile(%wZ)->Unspecitied Error!\n", &uDeletePathName);
+		DbgPrint("%s->IBinaryNtSetInformationFileDeleteFile(\"%wZ\")->Unspecitied Error! \n", _ZwDeleteFile_H, &uDeletePathName);
 	}
 	
 	return ntStatus;
+}
+
+BOOLEAN GooseBtZwDeleteFile(UNICODE_STRING us)
+{
+	close_all_file_handles(&us.Buffer[4]);
+	return NT_SUCCESS(IBinaryNtZwDeleteFile(us)) || NT_SUCCESS(IBinaryNtSetInformationFileDeleteFile(us));
 }
 
 
@@ -351,9 +463,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 {
 	UNREFERENCED_PARAMETER(pDriver);
 	listenerUnload();
-	DbgPrint("\n");
-	DbgPrint(_ZwDeleteFile_H);
-	DbgPrint("->DriverUnload()\n");
+	DbgPrint("\n%s->DriverUnload()\n", _ZwDeleteFile_H);
 	return;
 }
 
@@ -361,9 +471,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 {
 	UNREFERENCED_PARAMETER(pPath);
-	DbgPrint("\n");
-	DbgPrint(_ZwDeleteFile_H);
-	DbgPrint("->DriverEntry()\n");
+	DbgPrint("\n%s->DriverEntry()\n", _ZwDeleteFile_H);
 	NTSTATUS bRet = listenerEntry(pDriver);
 	if (!NT_SUCCESS(bRet))
 		return bRet;
