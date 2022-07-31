@@ -84,6 +84,12 @@ A kernel driver to monitor keyboard.
 
 A kernel driver to protect processes. Note that ZwTerminateProcess.sys can defeat this protection. 
 
+## KMDFPTM.sys
+
+Release
+
+A kernel driver to monitor the creation and deletion of processes, threads, and modules. 
+
 ## KMDFReg.sys
 
 Scheduled
@@ -95,12 +101,6 @@ A kernel driver to monitor Registry.
 Release
 
 A kernel driver to monitor data flows among serials. 
-
-## KMDFThread.sys
-
-Release
-
-A kernel driver to monitor the creation and deletion of processes and threads. 
 
 ## NTNoFileCreate.sys
 
