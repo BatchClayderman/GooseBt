@@ -61,12 +61,12 @@ BOOL CClickProgrameApp::InitInstance()
 	CClickProgrameDlg dlg;
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
-	if (nResponse == IDOK)
+	if (IDOK == nResponse)
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with OK
 	}
-	else if (nResponse == IDCANCEL)
+	else if (IDCANCEL == nResponse)
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with Cancel
