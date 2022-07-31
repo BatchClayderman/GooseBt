@@ -32,27 +32,12 @@ NTSTATUS DispatchCommon(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 
 NTSTATUS DispatchCreate(PDEVICE_OBJECT pDeviceObject, PIRP Irp)
 {
-	if (IS_MY_CONTROL_DEVICE_OBJECT(pDeviceObject))
-	{
-		Irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
-		Irp->IoStatus.Information = 0;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return STATUS_INVALID_DEVICE_REQUEST;
-	}
-
-	PFILE_OBJECT FileObject = IoGetCurrentIrpStackLocation(Irp)->FileObject;
-	PIO_STACK_LOCATION Stack = IoGetCurrentIrpStackLocation(Irp);
-
-	ULONG Option = Stack->Parameters.Create.Options;
-	if ((Option >> 24) == FILE_CREATE)
-	{
-		DbgPrint("%s->%wZ->%x\n", _NTNoFileCreate_H, &FileObject->FileName, Option);
-		Irp->IoStatus.Status = STATUS_ACCESS_DENIED;
-		IofCompleteRequest(Irp, IO_NO_INCREMENT);
-		return STATUS_ACCESS_DENIED;
-	}
-	
-	return STATUS_SUCCESS;
+	UNREFERENCED_PARAMETER(pDeviceObject);
+	DbgPrint("%s->Prevent->%wZ", _NTNoFileCreate_H, &pDeviceObject->DriverObject->DriverName);
+	Irp->IoStatus.Status = STATUS_ACCESS_DENIED;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+	return Irp->IoStatus.Status;
 }
 
 VOID DriverNotificationRoutine(PDEVICE_OBJECT pDevice, BOOLEAN FsActive)

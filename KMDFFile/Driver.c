@@ -5,14 +5,13 @@
 #endif
 
 
+
 /** 驱动出入口函数 **/
 /* 驱动停止 */
 VOID DriverUnload(PDRIVER_OBJECT pDriver)
 {
 	UNREFERENCED_PARAMETER(pDriver);
-	DbgPrint("\n");
-	DbgPrint(_KMDFFile_H);
-	DbgPrint("->DriverUnload()\n");
+	DbgPrint("\n%s->DriverUnload()\n", _KMDFFile_H);
 	return;
 }
 
@@ -20,9 +19,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 {
 	UNREFERENCED_PARAMETER(pPath);
-	DbgPrint("\n");
-	DbgPrint(_KMDFFile_H);
-	DbgPrint("->DriverEntry()\n");
+	DbgPrint("\n%s->DriverEntry()\n", _KMDFFile_H);
 	pDriver->DriverUnload = DriverUnload;
 	return STATUS_SUCCESS;
 }
