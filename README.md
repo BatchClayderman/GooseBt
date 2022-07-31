@@ -12,7 +12,7 @@ A console application to test the loading of DLL file. Currently, it has nothing
 
 ## ClickProgram
 
-Schedule
+Scheduled
 
 A GUI written by C\#. This is used for automatic clicking and Bad HID testing. 
 
@@ -32,7 +32,7 @@ A DLL file to help run the dynamic codes in different Windows environment. Curre
 
 Developing
 
-An MFC application to provide the main windows. 
+An MFC application to provide the main window. 
 
 ## GooseBtMonitor
 
