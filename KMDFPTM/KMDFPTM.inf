@@ -1,5 +1,5 @@
 ;
-; KMDFThread.inf
+; KMDFPTM.inf
 ;
 
 [Version]
@@ -7,13 +7,13 @@ Signature="$WINDOWS NT$"
 Class=GooseBt ; TODO: edit Class
 ClassGuid={6C43728A-A556-A504-529B-E63F5D874A3D} ; TODO: edit ClassGuid
 Provider=%ManufacturerName%
-CatalogFile=KMDFThread.cat
+CatalogFile=KMDFPTM.cat
 DriverVer= ; TODO: set DriverVer in stampinf property pages
 PnpLockdown=1
 
 [DestinationDirs]
 DefaultDestDir = 12
-KMDFThread_Device_CoInstaller_CopyFiles = 11
+KMDFPTM_Device_CoInstaller_CopyFiles = 11
 
 ; ================= Class section =====================
 
@@ -28,7 +28,7 @@ HKR,,Icon,,-5
 1 = %DiskName%,,,""
 
 [SourceDisksFiles]
-KMDFThread.sys  = 1,,
+KMDFPTM.sys  = 1,,
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
 
 ;*****************************************
@@ -39,49 +39,49 @@ WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with
 %ManufacturerName%=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-%KMDFThread.DeviceDesc%=KMDFThread_Device, Root\KMDFThread ; TODO: edit hw-id
+%KMDFPTM.DeviceDesc%=KMDFPTM_Device, Root\KMDFPTM ; TODO: edit hw-id
 
-[KMDFThread_Device.NT]
+[KMDFPTM_Device.NT]
 CopyFiles=Drivers_Dir
 
 [Drivers_Dir]
-KMDFThread.sys
+KMDFPTM.sys
 
 ;-------------- Service installation
-[KMDFThread_Device.NT.Services]
-AddService = KMDFThread,%SPSVCINST_ASSOCSERVICE%, KMDFThread_Service_Inst
+[KMDFPTM_Device.NT.Services]
+AddService = KMDFPTM,%SPSVCINST_ASSOCSERVICE%, KMDFPTM_Service_Inst
 
-; -------------- KMDFThread driver install sections
-[KMDFThread_Service_Inst]
-DisplayName    = %KMDFThread.SVCDESC%
+; -------------- KMDFPTM driver install sections
+[KMDFPTM_Service_Inst]
+DisplayName    = %KMDFPTM.SVCDESC%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %12%\KMDFThread.sys
+ServiceBinary  = %12%\KMDFPTM.sys
 
 ;
-;--- KMDFThread_Device Coinstaller installation ------
+;--- KMDFPTM_Device Coinstaller installation ------
 ;
 
-[KMDFThread_Device.NT.CoInstallers]
-AddReg=KMDFThread_Device_CoInstaller_AddReg
-CopyFiles=KMDFThread_Device_CoInstaller_CopyFiles
+[KMDFPTM_Device.NT.CoInstallers]
+AddReg=KMDFPTM_Device_CoInstaller_AddReg
+CopyFiles=KMDFPTM_Device_CoInstaller_CopyFiles
 
-[KMDFThread_Device_CoInstaller_AddReg]
+[KMDFPTM_Device_CoInstaller_AddReg]
 HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
 
-[KMDFThread_Device_CoInstaller_CopyFiles]
+[KMDFPTM_Device_CoInstaller_CopyFiles]
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
 
-[KMDFThread_Device.NT.Wdf]
-KmdfService =  KMDFThread, KMDFThread_wdfsect
-[KMDFThread_wdfsect]
+[KMDFPTM_Device.NT.Wdf]
+KmdfService =  KMDFPTM, KMDFPTM_wdfsect
+[KMDFPTM_wdfsect]
 KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
 ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
 ClassName="Samples" ; TODO: edit ClassName
-DiskName = "KMDFThread Installation Disk"
-KMDFThread.DeviceDesc = "KMDFThread Device"
-KMDFThread.SVCDESC = "KMDFThread Service"
+DiskName = "KMDFPTM Installation Disk"
+KMDFPTM.DeviceDesc = "KMDFPTM Device"
+KMDFPTM.SVCDESC = "KMDFPTM Service"

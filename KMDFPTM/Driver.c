@@ -1,7 +1,8 @@
+#include <ntifs.h>
 #include <ntddk.h>
 #include <windef.h>
 #include <stdio.h>
-#include <string.h>
+//#include <string.h>
 #ifndef _KMDFPTM_H
 #define _KMDFPTM_H "KMDFPTM"
 #ifndef DeviceName
@@ -18,7 +19,6 @@
 
 /** 全局变量 **/
 ULONG ProcessNameOffset = 0;
-NTSTATUS PsLookupProcessByProcessId(IN ULONG ulProcId, OUT PEPROCESS* pEProcess);
 HANDLE g_dwProcessId;
 BOOL g_bMainThread;
 //VOID ImageCreateMon(IN PUNICODE_STRING FullImageName, IN HANDLE ProcessId, IN PIMAGE_INFO ImageInfo );
@@ -100,7 +100,7 @@ VOID ProcessCreateMon(IN HANDLE hParentId, IN HANDLE PId, IN BOOLEAN bCreate)
 
 #ifdef _AMD64_  
 	ULONG ProcessId = HandleToUlong(PId);
-	status = PsLookupProcessByProcessId(ProcessId, &EProcess);
+	status = PsLookupProcessByProcessId(UlongToHandle(ProcessId), &EProcess);
 #else  
 	//HANDLE ProcessId = PId;
 	status = PsLookupProcessByProcessId((ULONG)PId, &EProcess);
@@ -146,8 +146,8 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 	ULONG System = 4;
 	ULONG dwParentPID = HandleToUlong(PsGetCurrentProcessId());
 	ULONG ProcessId = HandleToUlong(PId);
-	status = PsLookupProcessByProcessId(ProcessId, &EProcess);
-	status = PsLookupProcessByProcessId(dwParentPID, &ParentEProcess);
+	status = PsLookupProcessByProcessId(UlongToHandle(ProcessId), &EProcess);
+	status = PsLookupProcessByProcessId(UlongToHandle(dwParentPID), &ParentEProcess);
 #else  
 	HANDLE System = (HANDLE)4;
 	HANDLE dwParentPID = PsGetCurrentProcessId();
