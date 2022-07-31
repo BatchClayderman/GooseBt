@@ -32,25 +32,25 @@ Scheduled
 
 A DLL file to help run the dynamic codes in different Windows environment. Currently, it has nothing to do. 
 
-## GooseBtMain
+## GooseBtMain.exe
 
 Developing
 
 An MFC application to provide the main window. 
 
-## GooseBtMonitor
+## GooseBtMonitor.exe
 
-Release
+Testing
 
 A console application to check out whether GooseBt itself is running actively and normally. 
 
-## GooseBtSVC
+## GooseBtSVC.exe
 
 Release
 
 A service to help run the GooseBt. It would create a log in its directory. 
 
-## GooseBtTray
+## GooseBtTray.exe
 
 Developing
 
