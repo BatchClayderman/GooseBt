@@ -138,13 +138,13 @@ Release
 
 A console application to manage process. Both commandline mode and interactive mode are supported. 
 
-## ZwDeleteFile
+## ZwDeleteFile.sys
 
 Testing
 
 A kernel driver to delete file forcibly in kernel mode. Currently, it could not remove occuried or protected files still. Forcibly removing directory is not supported. 
 
-## ZwOpReg
+## ZwOpReg.sys
 
 Scheduled
 
