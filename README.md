@@ -4,13 +4,17 @@ Developing GooseBt Anti-virus Framework
 
 Scheduled -> Developing -> Testing -> Release
 
+## Win DOS
+
+This is a folder, which should be hidden. The folder provides script tools written in Batch and VBS language. When one is in Windows PE or extreme limitation mode including no drivers or services could be installed or started, the tools could do a favor. 
+
 ## AntiVirusMon.exe
 
 Scheduled
 
 A console application to test the loading of DLL file. Currently, it has nothing to do since GooseBtDll.dll has nothing to do. 
 
-## ClickProgram
+## ClickProgram.exe
 
 Scheduled
 
