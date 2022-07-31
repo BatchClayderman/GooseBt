@@ -2,18 +2,18 @@
 #include <windef.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef _KMDFThread_H
-#define _KMDFThread_H "KMDFThread"
+#ifndef _KMDFPTM_H
+#define _KMDFPTM_H "KMDFPTM"
 #ifndef DeviceName
-#define DeviceName L"\\Device\\KMDFThread"
+#define DeviceName L"\\Device\\KMDFPTM"
 #endif
 #ifndef DosDeviceName
-#define DosDeviceName L"\\DosDevices\\KMDFThread"
+#define DosDeviceName L"\\DosDevices\\KMDFPTM"
 #endif
 #ifndef SYSNAME
 #define SYSNAME "System"  
 #endif
-#endif//_KMDFThread_H
+#endif//_KMDFPTM_H
 
 
 /** 全局变量 **/
@@ -22,7 +22,7 @@ NTSTATUS PsLookupProcessByProcessId(IN ULONG ulProcId, OUT PEPROCESS* pEProcess)
 HANDLE g_dwProcessId;
 BOOL g_bMainThread;
 //VOID ImageCreateMon(IN PUNICODE_STRING FullImageName, IN HANDLE ProcessId, IN PIMAGE_INFO ImageInfo );
-char msg[MAX_PATH] = "NULL";
+char msg[MAX_PATH << 2] = _KMDFPTM_H;
 
 
 /** 命名管道 **/
@@ -32,7 +32,7 @@ NTSTATUS DeviceCreate(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 	pIrp->IoStatus.Status = STATUS_SUCCESS;// getLastError() 得到的值
 	pIrp->IoStatus.Information = 0;//返回给 R3 多少数据，没有填 0
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-	DbgPrint("%s->CreateOver\n", _KMDFThread_H);//不许 sprintf
+	DbgPrint("%s->CreateOver\n", _KMDFPTM_H);//不许 sprintf
 	return STATUS_SUCCESS;
 }
 
@@ -42,7 +42,7 @@ NTSTATUS DeviceClose(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 	pIrp->IoStatus.Status = STATUS_SUCCESS;
 	pIrp->IoStatus.Information = 0;
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-	DbgPrint("%s->CloseOver\n", _KMDFThread_H);//不许 sprintf
+	DbgPrint("%s->CloseOver\n", _KMDFPTM_H);//不许 sprintf
 	return STATUS_SUCCESS;
 }
 
@@ -63,7 +63,7 @@ NTSTATUS DeviceRead(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 	//memset(pIrp->AssociatedIrp.SystemBuffer, 0x90, readLength);
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 	strcpy_s(msg, sizeof(msg), "NULL");
-	//DbgPrint("%s->ReadOver\n", _KMDFThread_H);//不许 sprintf
+	//DbgPrint("%s->ReadOver\n", _KMDFPTM_H);//不许 sprintf
 	return STATUS_SUCCESS;
 }
 
@@ -76,7 +76,7 @@ NTSTATUS DeviceWrite(PDEVICE_OBJECT pDeviceObject, PIRP pIrp)
 	pIrp->IoStatus.Information = readLength;
 	memset(pIrp->AssociatedIrp.SystemBuffer, 0x90, readLength);
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-	//DbgPrint("%s->WriteOver\n", _KMDFThread_H);//不许 sprintf
+	//DbgPrint("%s->WriteOver\n", _KMDFPTM_H);//不许 sprintf
 	return STATUS_SUCCESS;
 }
 
@@ -108,7 +108,7 @@ VOID ProcessCreateMon(IN HANDLE hParentId, IN HANDLE PId, IN BOOLEAN bCreate)
 
 	if (!NT_SUCCESS(status))
 	{
-		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed! \n", _KMDFThread_H);
+		sprintf(msg, "%s->Process->PsLookupProcessByProcessId()->Failed! \n", _KMDFPTM_H);
 		DbgPrint(msg);
 		return;
 	}
@@ -119,18 +119,18 @@ VOID ProcessCreateMon(IN HANDLE hParentId, IN HANDLE PId, IN BOOLEAN bCreate)
 		lpCurProc = (LPTSTR)EProcess;
 		lpCurProc = lpCurProc + ProcessNameOffset;
 		
-		sprintf(msg, "%s->Created->Process = %s->PID = %u->Address = 0x%x->PPID = %u\n",
-			_KMDFThread_H, 
+		sprintf(msg, "%s->Process->Created->Process = %s->PID = %u->Address = 0x%x->PPID = %u\n",
+			_KMDFPTM_H, 
 			lpCurProc, 
 			HandleToULong(PId), 
-			(ULONG)EProcess, 
+			*(ULONG*)EProcess, 
 			HandleToULong(hParentId)
 		);
 		DbgPrint(msg);
 	}
 	else
 	{
-		sprintf(msg, "%s->Terminated->PID = %u\n", _KMDFThread_H, HandleToULong(PId));
+		sprintf(msg, "%s->Process->Terminated->PID = %u\n", _KMDFPTM_H, HandleToULong(PId));
 		DbgPrint(msg);
 	}
 	return;
@@ -158,27 +158,27 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 
 	if (!NT_SUCCESS(status))
 	{
-		sprintf(msg, "%s->PsLookupProcessByProcessId()->Failed! \n", _KMDFThread_H);
+		sprintf(msg, "%s->Thread->PsLookupProcessByProcessId()->Failed! \n", _KMDFPTM_H);
 		DbgPrint(msg);
 		return;
 	}
 
 	if (bCreate)
 	{
-		if ((g_bMainThread == TRUE) && (ProcessId != System) && (ProcessId != dwParentPID))
+		if ((TRUE == g_bMainThread) && (ProcessId != System) && (ProcessId != dwParentPID))
 		{
 			HANDLE dwParentTID = PsGetCurrentThreadId();
 			lpCurProc = (LPTSTR)EProcess;
 			lpParnentProc = (LPTSTR)ParentEProcess;
 			lpCurProc += ProcessNameOffset;
 			lpParnentProc += ProcessNameOffset;
-			sprintf(msg, "%s->Call->(Process = %s->PID = %u->TID = %u)->(Process = %s->PID = %u->TID = %u)\n", 
-				_KMDFThread_H, 
+			sprintf(msg, "%s->Thread->Call->(Process = %s->PID = %u->TID = %u)->(Process = %s->PID = %u->TID = %u)\n", 
+				_KMDFPTM_H, 
 				lpParnentProc, 
-				HandleToULong(dwParentPID), 
+				dwParentPID, 
 				HandleToULong(dwParentTID), 
 				lpCurProc, 
-				HandleToULong(ProcessId), 
+				ProcessId, 
 				HandleToULong(TId)
 			);
 			DbgPrint(msg);
@@ -187,17 +187,17 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 
 		lpCurProc = (LPTSTR)EProcess;
 		lpCurProc = lpCurProc + ProcessNameOffset;
-		sprintf(msg, "%s->Created->Process = %s->PID = %d->TID = %d\n",
-			_KMDFThread_H,
-			(char*)lpCurProc,
-			(int)PId,
-			(int)TId
+		sprintf(msg, "%s->Thread->Created->Process = %s->PID = %u->TID = %u\n",
+			_KMDFPTM_H, 
+			lpCurProc, 
+			HandleToULong(PId), 
+			HandleToULong(TId)
 		);
 		DbgPrint(msg);
 	}
 	else
 	{
-		sprintf(msg, "%s->Terminated->TID = %d\n", _KMDFThread_H, (int)TId);
+		sprintf(msg, "%s->Thread->Terminated->TID = %u\n", _KMDFPTM_H, HandleToULong(TId));
 		DbgPrint(msg);
 	}
 	return;
@@ -205,12 +205,12 @@ VOID ThreadCreateMon(IN HANDLE PId, IN HANDLE TId, IN BOOLEAN bCreate)
 
 VOID ImageCreateMon(IN PUNICODE_STRING FullImageName, IN HANDLE ProcessId, IN PIMAGE_INFO ImageInfo)
 {
-	sprintf(msg, "%s->ImageCreate->(FullImageName = %S->PID = %d)->(ImageBase = %x->ImageSize = %d)",
-		_KMDFThread_H,
+	sprintf(msg, "%s->Module->(FullImageName = %S->PID = %u)->(ImageBase = %x->ImageSize = %llu)",
+		_KMDFPTM_H,
 		FullImageName->Buffer,
-		(int)ProcessId,
-		(ULONG)(ImageInfo->ImageBase),
-		(int)ImageInfo->ImageSize
+		HandleToULong(ProcessId), 
+		*(ULONG*)(ImageInfo->ImageBase),
+		ImageInfo->ImageSize
 	);
 	DbgPrint(msg);
 	return;
@@ -231,22 +231,21 @@ ULONG GetProcessNameOffset()
 /* 驱动停止 */
 VOID DriverUnload(IN PDRIVER_OBJECT DriverObject)
 {
-	strcpy_s(msg, sizeof(msg), "STOP");
 	UNICODE_STRING linkString;
-	//PsRemoveLoadImageNotifyRoutine(ImageCreateMon);  
-	PsRemoveCreateThreadNotifyRoutine(ThreadCreateMon);
 	PsSetCreateProcessNotifyRoutine(ProcessCreateMon, TRUE);
+	PsRemoveCreateThreadNotifyRoutine(ThreadCreateMon);
+	PsRemoveLoadImageNotifyRoutine(ImageCreateMon);
 	RtlInitUnicodeString(&linkString, DosDeviceName);
 	IoDeleteSymbolicLink(&linkString);
 	IoDeleteDevice(DriverObject->DeviceObject);
-	DbgPrint("\n%s->DriverUnload()\n", _KMDFThread_H);//不许 sprintf
+	DbgPrint("\n%s->DriverUnload()\n", _KMDFPTM_H);//不许 sprintf
 	return;
 }
 
 /* 驱动启动 */
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
-	DbgPrint("\n%s->DriverEntry()\n", _KMDFThread_H);
+	DbgPrint("\n%s->DriverEntry()\n", _KMDFPTM_H);
 	UNREFERENCED_PARAMETER(RegistryPath);
 	NTSTATUS status = STATUS_SUCCESS;
 
@@ -264,8 +263,8 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 	);
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("%s->IoCreateDevice Failed! \n", _KMDFThread_H);
-		return STATUS_SUCCESS;// return ntstatus;
+		DbgPrint("%s->IoCreateDevice Failed! \n", _KMDFPTM_H);
+		return status;
 	}
 	status = IoCreateSymbolicLink(&linkString, &nameString);
 	if (!NT_SUCCESS(status))
@@ -274,42 +273,41 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registry
 		return status;
 	}
 	ProcessNameOffset = GetProcessNameOffset();
-	if (ProcessNameOffset == 0)
+	if (0 == ProcessNameOffset)
 	{
 		IoDeleteDevice(DriverObject->DeviceObject);
 		return STATUS_UNSUCCESSFUL;
 	}
-	
-	/*
-	status = PsSetLoadImageNotifyRoutine(ImageCreateMon);  
-	if (!NT_SUCCESS( status ))  
-	{  
-		IoDeleteDevice(DriverObject->DeviceObject);  
-		DbgPrint(msg, "\n%s->PsSetLoadImageNotifyRoutine()->Failed!\n", _KMDFThread_H);
-		return status;  
-	}
-	*/
 
-	status = PsSetCreateThreadNotifyRoutine(ThreadCreateMon);
-	if (!NT_SUCCESS(status))
-	{
-		IoDeleteDevice(DriverObject->DeviceObject);
-		DbgPrint("\n%s->PsSetCreateThreadNotifyRoutine()->Failed! \n", _KMDFThread_H);
-		return status;
-	}
-
-	/*
+	/* 进程 */
 	status = PsSetCreateProcessNotifyRoutine(ProcessCreateMon, FALSE);
 	if (!NT_SUCCESS(status))
 	{
 		IoDeleteDevice(DriverObject->DeviceObject);
-		DbgPrint("\n%s->PsSetCreateProcessNotifyRoutine()\n", _KMDFThread_H);
+		DbgPrint("\n%s->PsSetCreateProcessNotifyRoutine()->Failed! \n", _KMDFPTM_H);
 		return status;
 	}
-	*/
 
-	//for (int i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
-	//	DriverObject->MajorFunction[i] = CommonDispatch;
+	/* 线程 */
+	status = PsSetCreateThreadNotifyRoutine(ThreadCreateMon);
+	if (!NT_SUCCESS(status))
+	{
+		IoDeleteDevice(DriverObject->DeviceObject);
+		DbgPrint("\n%s->PsSetCreateThreadNotifyRoutine()->Failed! \n", _KMDFPTM_H);
+		return status;
+	}
+	
+	/* 模块 */
+	status = PsSetLoadImageNotifyRoutine(ImageCreateMon);  
+	if (!NT_SUCCESS( status ))  
+	{  
+		IoDeleteDevice(DriverObject->DeviceObject);  
+		DbgPrint(msg, "\n%s->PsSetLoadImageNotifyRoutine()->Failed! \n", _KMDFPTM_H);
+		return status;  
+	}
+	
+	for (int i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
+		DriverObject->MajorFunction[i] = CommonDispatch;
 
 	deviceObject->Flags |= DO_BUFFERED_IO;
 

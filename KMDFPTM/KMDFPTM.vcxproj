@@ -50,7 +50,7 @@
     <ClInclude Include="Trace.h" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="KMDFThread.inf" />
+    <Inf Include="KMDFPTM.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{74291B87-442C-489E-8E96-0F6F43CCA86E}</ProjectGuid>
@@ -59,7 +59,8 @@
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
-    <RootNamespace>KMDFThread</RootNamespace>
+    <RootNamespace>KMDFPTM</RootNamespace>
+    <ProjectName>KMDFPTM</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

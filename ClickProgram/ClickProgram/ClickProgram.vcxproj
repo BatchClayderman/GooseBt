@@ -12,8 +12,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2CC10C16-E63E-4E78-B50B-3F2A9DD512B6}</ProjectGuid>
-    <RootNamespace>ClickPrograme</RootNamespace>
+    <RootNamespace>ClickProgram</RootNamespace>
     <Keyword>MFCProj</Keyword>
+    <ProjectName>ClickProgram</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -107,8 +108,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ClickPrograme.cpp" />
-    <ClCompile Include="ClickProgrameDlg.cpp" />
+    <ClCompile Include="ClickProgram.cpp" />
+    <ClCompile Include="ClickProgramDlg.cpp" />
     <ClCompile Include="DlgInput.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -116,21 +117,21 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ClickPrograme.h" />
-    <ClInclude Include="ClickProgrameDlg.h" />
+    <ClInclude Include="ClickProgram.h" />
+    <ClInclude Include="ClickProgramDlg.h" />
     <ClInclude Include="DlgInput.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="tagActionEvent.h" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\ClickPrograme.ico" />
+    <Image Include="res\ClickProgram.ico" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="ClickPrograme.rc" />
+    <ResourceCompile Include="ClickProgram.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\ClickPrograme.rc2" />
+    <None Include="res\ClickProgram.rc2" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -140,7 +141,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties RESOURCE_FILE="ClickPrograme.rc" />
+      <UserProperties RESOURCE_FILE="ClickProgram.rc" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

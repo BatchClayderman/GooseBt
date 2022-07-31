@@ -3,55 +3,55 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Scanner", "Scanner\Scanner.vcxproj", "{F7153525-B710-4BE3-B191-3A7727CEC9B6}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AntiVirusMon", "AntiVirusMon\AntiVirusMon.vcxproj", "{C27E8B97-0ADD-4390-8BB1-7A32EB748DCA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtDll", "GooseBtDll\GooseBtDll.vcxproj", "{727E3469-A9F9-454F-95AE-93C17347E28D}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtSVC", "GooseBtSVC\GooseBtSVC.vcxproj", "{8A6D60F1-D0DD-4BCC-BD3A-1EC552965D05}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SVCLauncher", "SVCLauncher\SVCLauncher.vcxproj", "{5161551A-BD67-49F1-9B9D-887D0715046D}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtMain", "GooseBtMain\GooseBtMain.vcxproj", "{35527AFC-1773-44F5-9B89-AA5AFC3BA095}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtUpdate", "GooseBtUpdate\GooseBtUpdate.vcxproj", "{D1C687D0-54E3-4DF8-ACCE-FAEDDEAB069B}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFKeyboard", "KMDFKeyboard\KMDFKeyboard.vcxproj", "{AF313E06-9F25-4B86-A5A1-A17B031E0FC9}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFSerial", "KMDFSerial\KMDFSerial.vcxproj", "{9ED7E203-D47B-4BF0-A9EA-E1AD5DE08232}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwDeleteFile", "ZwDeleteFile\ZwDeleteFile.vcxproj", "{5B98003B-CD0D-4244-BD49-69553697B07A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ClickProgram", "ClickProgram\ClickProgram\ClickProgram.vcxproj", "{2CC10C16-E63E-4E78-B50B-3F2A9DD512B6}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DriverLoader", "DriverLoader\DriverLoader.vcxproj", "{FFCC9B83-B3E4-46C0-AA9E-1B78D5917BFC}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFProcessProtector", "KMDFProcessProtector\KMDFProcessProtector.vcxproj", "{670E8DC9-2180-4EA4-93AD-05B414963ACE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtDll", "GooseBtDll\GooseBtDll.vcxproj", "{727E3469-A9F9-454F-95AE-93C17347E28D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwTerminateProcess", "ZwTerminateProcess\ZwTerminateProcess.vcxproj", "{E9DF5FA1-4FFA-4F33-8AF0-2E131906FA55}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwOpReg", "ZwOpReg\ZwOpReg.vcxproj", "{A8D252C9-7318-4166-9DD1-DA8F3FE711A8}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFReg", "KMDFReg\KMDFReg.vcxproj", "{7C9042ED-E8E8-4812-8C50-54D2E42719B5}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFThread", "KMDFThread\KMDFThread.vcxproj", "{74291B87-442C-489E-8E96-0F6F43CCA86E}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NTNoFileCreate", "NTNoFileCreate\NTNoFileCreate.vcxproj", "{96E5E7FB-2E63-4684-BA88-4EFEF691BA5C}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NTNoProcessCreate", "NTNoProcessCreate\NTNoProcessCreate.vcxproj", "{DF278C66-F084-4ED6-85A7-11178BFEC051}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFFileProtector", "KMDFFileProtector\KMDFFileProtector.vcxproj", "{15104794-5394-456C-978C-72491DA7A8F8}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFFile", "KMDFFile\KMDFFile.vcxproj", "{3D7B98ED-048B-4DAB-964F-05CFF7DAB51B}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wmif", "wmif\wmif.vcxproj", "{0D85FFC3-005C-482E-984F-01BF5BF42861}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ClickPrograme", "ClickPrograme\ClickPrograme\ClickPrograme.vcxproj", "{2CC10C16-E63E-4E78-B50B-3F2A9DD512B6}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtMain", "GooseBtMain\GooseBtMain.vcxproj", "{35527AFC-1773-44F5-9B89-AA5AFC3BA095}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtMonitor", "GooseBtMonitor\GooseBtMonitor.vcxproj", "{69522803-94AF-4E1D-849D-C79B54C1C637}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtSVC", "GooseBtSVC\GooseBtSVC.vcxproj", "{8A6D60F1-D0DD-4BCC-BD3A-1EC552965D05}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtTray", "GooseBtTray\GooseBtTray.vcxproj", "{2A00280E-E976-46CF-B381-D5EC8AAE950E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GooseBtUpdate", "GooseBtUpdate\GooseBtUpdate.vcxproj", "{D1C687D0-54E3-4DF8-ACCE-FAEDDEAB069B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFFile", "KMDFFile\KMDFFile.vcxproj", "{3D7B98ED-048B-4DAB-964F-05CFF7DAB51B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFFileProtector", "KMDFFileProtector\KMDFFileProtector.vcxproj", "{15104794-5394-456C-978C-72491DA7A8F8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFKeyboard", "KMDFKeyboard\KMDFKeyboard.vcxproj", "{AF313E06-9F25-4B86-A5A1-A17B031E0FC9}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFProcessProtector", "KMDFProcessProtector\KMDFProcessProtector.vcxproj", "{670E8DC9-2180-4EA4-93AD-05B414963ACE}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFPTM", "KMDFPTM\KMDFPTM.vcxproj", "{74291B87-442C-489E-8E96-0F6F43CCA86E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFReg", "KMDFReg\KMDFReg.vcxproj", "{7C9042ED-E8E8-4812-8C50-54D2E42719B5}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KMDFSerial", "KMDFSerial\KMDFSerial.vcxproj", "{9ED7E203-D47B-4BF0-A9EA-E1AD5DE08232}"
+EndProject
+xProject("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NTNoFileCreate", "NTNoFileCreate\NTNoFileCreate.vcxproj", "{96E5E7FB-2E63-4684-BA88-4EFEF691BA5C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NTNoProcessCreate", "NTNoProcessCreate\NTNoProcessCreate.vcxproj", "{DF278C66-F084-4ED6-85A7-11178BFEC051}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Scanner", "Scanner\Scanner.vcxproj", "{F7153525-B710-4BE3-B191-3A7727CEC9B6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SVCLauncher", "SVCLauncher\SVCLauncher.vcxproj", "{5161551A-BD67-49F1-9B9D-887D0715046D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wmif", "wmif\wmif.vcxproj", "{0D85FFC3-005C-482E-984F-01BF5BF42861}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wmip", "wmip\wmip.vcxproj", "{58D67C20-6CDE-493F-A088-AC703C05060B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwDeleteFile", "ZwDeleteFile\ZwDeleteFile.vcxproj", "{5B98003B-CD0D-4244-BD49-69553697B07A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwOpReg", "ZwOpReg\ZwOpReg.vcxproj", "{A8D252C9-7318-4166-9DD1-DA8F3FE711A8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZwTerminateProcess", "ZwTerminateProcess\ZwTerminateProcess.vcxproj", "{E9DF5FA1-4FFA-4F33-8AF0-2E131906FA55}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

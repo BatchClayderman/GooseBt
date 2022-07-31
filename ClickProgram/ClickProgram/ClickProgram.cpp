@@ -2,8 +2,8 @@
 //
 
 #include "stdafx.h"
-#include "ClickPrograme.h"
-#include "ClickProgrameDlg.h"
+#include "ClickProgram.h"
+#include "ClickProgramDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

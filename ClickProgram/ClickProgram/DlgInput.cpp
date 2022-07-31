@@ -2,9 +2,9 @@
 //
 
 #include "stdafx.h"
-#include "ClickPrograme.h"
+#include "ClickProgram.h"
 #include "DlgInput.h"
-#include "ClickProgrameDlg.h"
+#include "ClickProgramDlg.h"
 
 // CDlgInput dialog
 
