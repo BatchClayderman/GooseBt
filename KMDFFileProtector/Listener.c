@@ -66,7 +66,7 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//·Ö·¢º¯Êý
 				ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen);
 				if (NULL == buffer || inlen >= MAX_PATH || inlen <= 0 || 0 != outlen)
 				{
-					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)", _KMDFFileProtector_H);
+					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)\n", _KMDFFileProtector_H);
 					break;
 				}
 				wchar_t tmp[MAX_PATH] = { 0 };

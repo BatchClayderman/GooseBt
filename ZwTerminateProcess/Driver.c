@@ -332,7 +332,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 	DbgPrint("\n%s->DriverEntry()\n", _ZwTerminateProcess_H);
 	NTSTATUS bRet = listenerEntry(pDriver);
 	if (!NT_SUCCESS(bRet))
+	{
+		DbgPrint("%s->Initial->Listener->Failed! ", _ZwTerminateProcess_H);
 		return bRet;
+	}
 	pDriver->DriverUnload = DriverUnload;
 	return STATUS_SUCCESS;
 }

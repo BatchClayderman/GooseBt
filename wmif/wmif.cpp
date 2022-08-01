@@ -81,24 +81,26 @@ EXTERN_C BOOL GetFilePathFromHandleA(HANDLE hFile, LPSTR  lpszPath, UINT cchMax)
 #undef CWK_DEV_SYM_P
 #endif
 #define CWK_DEV_SYM_P L"\\\\.\\GooseBtKMDFFileProtector"
-#ifdef CWK_DEV_SYM_S//重要
-#undef CWK_DEV_SYM_S
+#ifdef CWK_DEV_SYM_F//重要
+#undef CWK_DEV_SYM_F
 #endif
-#define CWK_DEV_SYM_S L"\\\\.\\GooseBtZwDeleteFile"
+#define CWK_DEV_SYM_F L"\\\\.\\GooseBtZwDeleteFile"
 
 /* 从应用层给驱动发送一个字符串 */
-#define  CWK_DVC_SEND_STR     \
-	(ULONG)CTL_CODE(          \
-	0x00000022,               \
-	0x911,0,                  \
-	FILE_WRITE_DATA)
+#define CWK_DVC_SEND_STR     \
+	(ULONG)CTL_CODE(         \
+	0x00000022,              \
+	0x911,0,                 \
+	FILE_WRITE_DATA          \
+)
 
 /* 从驱动读取一个字符串 */
-#define  CWK_DVC_RECV_STR     \
-	(ULONG)CTL_CODE(          \
-	FILE_DEVICE_UNKNOWN,      \
-	0x912,METHOD_BUFFERED,    \
-	FILE_READ_DATA)
+#define CWK_DVC_RECV_STR       \
+	(ULONG)CTL_CODE(           \
+	FILE_DEVICE_UNKNOWN,       \
+	0x912,METHOD_BUFFERED,     \
+	FILE_READ_DATA             \
+)
 #endif//DriverConnection_H
 
 
@@ -715,7 +717,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					continue;
 				}
 				if (0 == _wcsicmp(argv[1], L"smash"))//驱删
-					DriverConnector(argv[i], CWK_DEV_SYM_S);
+					DriverConnector(argv[i], CWK_DEV_SYM_F);
 				else//不涉及驱动的其它操作
 				{
 					if (!FindFileHandle(path.c_str(), vecHandles))

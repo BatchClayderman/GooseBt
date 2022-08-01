@@ -1,5 +1,6 @@
 #include <ntddk.h>
 #include <ntstrsafe.h>
+#include "Listener.h"
 #ifndef _ZwOpReg_H
 #define _ZwOpReg_H "ZwOpReg"
 #define GooseBtKeyPath L"\\registry\\machine\\SoftWare\\GooseBt"
@@ -294,6 +295,7 @@ VOID DriverUnload(PDRIVER_OBJECT pDriver)
 {
 	UNREFERENCED_PARAMETER(pDriver);
 	DbgPrint("\n%s->DriverUnload()\n", _ZwOpReg_H);
+	listenerUnload();
 	return;
 }
 
@@ -303,6 +305,12 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 	UNREFERENCED_PARAMETER(pPath);
 	DbgPrint("\n%s->DriverEntry()\n", _ZwOpReg_H);
 	pDriver->DriverUnload = DriverUnload;
+	NTSTATUS bRet = listenerEntry(pDriver);
+	if (!NT_SUCCESS(bRet))
+	{
+		DbgPrint("%s->Initial->Listener->Failed! ", _ZwOpReg_H);
+		return bRet;
+	}
 	UNICODE_STRING uPath, uSubKey;
 	RtlInitUnicodeString(&uPath, GooseBtKeyPath);
 	RtlInitUnicodeString(&uSubKey, ZwOpRegSubKey);

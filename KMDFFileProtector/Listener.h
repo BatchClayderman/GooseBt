@@ -1,5 +1,4 @@
 #pragma once
-#include <ntifs.h>
 VOID listenerUnload();
-NTSTATUS listenerEntry();
+NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver);
 BOOLEAN NtOccurFile(UNICODE_STRING uPathName);

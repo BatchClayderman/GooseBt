@@ -1,8 +1,8 @@
 #include <ntifs.h>
 #include <ntstrsafe.h>
 #include "Listener.h"
-#ifndef _ZwTerminateProcess_H
-#define _ZwTerminateProcess_H "ZwTerminateProcess"
+#ifndef _ZwOpReg_H
+#define _ZwOpReg_H "ZwOpReg"
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
@@ -15,11 +15,11 @@
 #ifdef DeviceName
 #undef DeviceName
 #endif
-#define DeviceName L"\\Device\\GooseBtZwTerminateProcess"
+#define DeviceName L"\\Device\\GooseBtZwOpReg"
 #ifdef CWK_CDO_SYB_NAME
 #undef CWK_CDO_SYB_NAME
 #endif
-#define CWK_CDO_SYB_NAME  L"\\??\\GooseBtZwTerminateProcess"//在 R0 层的链接符号
+#define CWK_CDO_SYB_NAME  L"\\??\\GooseBtZwOpReg"//在 R0 层的链接符号
 
 /* 从应用层给驱动发送一个字符串 */
 #ifndef CWK_DVC_SEND_STR
@@ -40,7 +40,7 @@
 	FILE_READ_DATA             \
 )
 #endif
-#endif//_ZwTerminateProcess_H
+#endif//_ZwOpReg_H
 PDEVICE_OBJECT g_cdo = NULL;//控制设备
 
 
@@ -68,103 +68,72 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 			switch (irpsp->Parameters.DeviceIoControl.IoControlCode)
 			{
 			case CWK_DVC_SEND_STR:
-				ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen);
+				ASSERT(buffer != NULL && inlen < MAX_PATH&& inlen > 0 && 0 == outlen);
 				if (NULL == buffer || inlen >= MAX_PATH || inlen <= 0 || 0 != outlen)
 				{
-					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)\n", _ZwTerminateProcess_H);
+					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)", _ZwOpReg_H);
 					break;
 				}
 				short int choice = 0;//请求方案
 				char bufIN[MAX_PATH] = { 0 };
-				DWORD pid = 0;//目标 PID
-				DWORD* pointer = &pid;
 				strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), (char*)buffer);
-				if (strlen(bufIN) == 3//防止出错
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
+				if (strlen(bufIN) > 4//防止出错
+					&& (bufIN[0] == 'A' || bufIN[0] == 'a')
 					&& (bufIN[1] == 'D' || bufIN[1] == 'd')
-					&& (bufIN[2] == 'R' || bufIN[2] == 'r')
-				)// /dr 指令
+					&& (bufIN[2] == 'D' || bufIN[2] == 'd')
+					&& (bufIN[3] == ' ')
+					)// add 指令
 				{
-					DbgPrint("%s->GetWmipMsg()->DrivenReboot()\n", _ZwTerminateProcess_H);
-					DrivenReboot();
-					return STATUS_SUCCESS;
-				}
-				else if (strlen(bufIN) == 3//防止出错
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
-					&& (bufIN[1] == 'D' || bufIN[1] == 'd')
-					&& (bufIN[2] == 'S' || bufIN[2] == 's')
-				)// /df 指令
-				{
-#if (defined _WIN64 || defined WIN64)
-					DbgPrint("%s->GetWmipMsg()->DrivenShutdown()->x86 only! \n", _ZwTerminateProcess_H);
-					return STATUS_ABANDONED;
-#else
-					DbgPrint("%s->GetwmipMsg()->DrivenShutdown()\n", _ZwTerminateProcess_H);
-					DrivenShutdown();
-					return STATUS_SUCCESS;
-#endif
-				}
-				else if (strlen(bufIN) == 3//防止出错
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
-					&& (bufIN[1] == 'D' || bufIN[1] == 'd')
-					&& (bufIN[2] == 'E' || bufIN[2] == 'e')
-				)// /df 指令
-				{
-					DbgPrint("%s->GetWmipMsg()->DrivenError()\n", _ZwTerminateProcess_H);
-					DrivenError();
-					return STATUS_SUCCESS;
+					choice = 1;//设置 /add
+					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
+					DbgPrint("%s->GetWmirMsg()->add(\"%s\")\n", _ZwOpReg_H, bufIN);
 				}
 				else if (strlen(bufIN) > 4//防止出错
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
-					&& (bufIN[1] == 'I' || bufIN[1] == 'i')
-					&& (bufIN[2] == 'M' || bufIN[2] == 'm')
-					&& (bufIN[3] == ' ')
-					)// /im 指令
-				{
-					choice = 1;//设置 /im
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
-					DbgPrint("%s->GetWmipMsg()->ZwTerminateProcessByProcessName(\"%s\")\n", _ZwTerminateProcess_H, bufIN);
-				}
-				else if (strlen(bufIN) > 5//防止出错
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
-					&& (bufIN[1] == 'P' || bufIN[1] == 'p')
-					&& (bufIN[2] == 'I' || bufIN[2] == 'i')
-					&& (bufIN[3] == 'D' || bufIN[3] == 'd')
-					&& (bufIN[4] == ' ')
-				)// /pid 指令
-				{
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[5]);
-					if (StringToULONG(bufIN, pointer))
-					{
-						choice = 2;//设置 /pid
-						DbgPrint("%s->GetWmipMsg()->ZwTerminateProcessByPID(%u)\n", _ZwTerminateProcess_H, *pointer);
-					}
-					else
-						DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwTerminateProcess_H, bufIN);//无效指令充当接收信息
-				}
-				else if (strlen(bufIN) == 4//直接指定
-					&& (bufIN[0] == '/' || bufIN[0] == '-')
-					&& (bufIN[1] == 'A' || bufIN[1] == 'a')
+					&& (bufIN[0] == 'D' || bufIN[0] == 'd')
+					&& (bufIN[1] == 'E' || bufIN[1] == 'e')
 					&& (bufIN[2] == 'L' || bufIN[2] == 'l')
-					&& (bufIN[3] == 'L' || bufIN[3] == 'l')
-				)// /pid 指令
+					&& (bufIN[3] == ' ')
+					)// del 指令
 				{
-					choice = 3;//设置 /all
-					DbgPrint("%s->GetWmipMsg()->ZwTerminateAll()\n", _ZwTerminateProcess_H);
+					choice = 2;//设置 del
+					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
+					DbgPrint("%s->GetWmirMsg()->del(\"%s\")\n", _ZwOpReg_H, bufIN);
+				}
+				else if (strlen(bufIN) > 4//防止出错
+					&& (bufIN[0] == 'S' || bufIN[0] == 's')
+					&& (bufIN[1] == 'E' || bufIN[1] == 'e')
+					&& (bufIN[2] == 'T' || bufIN[2] == 't')
+					&& (bufIN[3] == ' ')
+					)// set 指令
+				{
+					choice = 3;//设置 set
+					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
+					DbgPrint("%s->GetWmirMsg()->set(\"%s\")\n", _ZwOpReg_H, bufIN);
+				}
+				else if (strlen(bufIN) > 6//防止出错
+					&& (bufIN[0] == 'Q' || bufIN[0] == 'q')
+					&& (bufIN[1] == 'U' || bufIN[1] == 'u')
+					&& (bufIN[2] == 'E' || bufIN[2] == 'e')
+					&& (bufIN[3] == 'R' || bufIN[3] == 'r')
+					&& (bufIN[4] == 'Y' || bufIN[4] == 'y')
+					&& (bufIN[5] == ' ')
+					)// query 指令
+				{
+					choice = 4;//设置 query
+					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
+					DbgPrint("%s->GetWmirMsg()->query\"%s\")\n", _ZwOpReg_H, bufIN);
 				}
 				else
-					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwTerminateProcess_H, bufIN);//无效指令充当接收信息
+					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwOpReg_H, bufIN);//无效指令充当接收信息
 				switch (choice)
 				{
-				case 1://执行 /im
-					ZwKillImage(bufIN);
+				case 1://执行 add
 					break;
-				case 2://执行 /pid
-					PIDCallTerminate(pid);
+				case 2://执行 del
 					break;
-				case 3:
-					for (DWORD i = 0; i <= 240000; i += 4)
-						PIDCallTerminate(240000 - i);//从后往前杀
+				case 3://执行 set
+					break;
+				case 4://执行 query
 					break;
 				default:
 					break;
@@ -220,7 +189,7 @@ NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver)
 	if (!NT_SUCCESS(status))
 	{
 		IoDeleteDevice(g_cdo);//删除设备
-		DbgPrint(_ZwTerminateProcess_H);
+		DbgPrint(_ZwOpReg_H);
 		DbgPrint("->IoCreateDevice()->Failed!\n");
 		return status;
 	}
@@ -228,7 +197,7 @@ NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver)
 	/* 将所有的分发函数设置为自定义的 */
 	for (ULONG i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
 		pDriver->MajorFunction[i] = cwkDispatch;
-	DbgPrint(_ZwTerminateProcess_H);
+	DbgPrint(_ZwOpReg_H);
 	DbgPrint("->IoCreateDevice()->Successful!\n");
 
 	/* 清除控制设备的初始化标记 */

@@ -84,6 +84,8 @@ A kernel driver to monitor keyboard.
 
 ## KMDFProcessProtector.sys
 
+Release
+
 A kernel driver to protect processes. Note that ZwTerminateProcess.sys can defeat this protection. 
 
 ## KMDFPTM.sys
@@ -139,6 +141,12 @@ A console application to manage file. Only commandline mode is supported.
 Release
 
 A console application to manage process. Both commandline mode and interactive mode are supported. 
+
+## wmir.exe
+
+Testing
+
+A console application to manage registry. Only commandline mode is supported. Only kernel operation is provided. 
 
 ## ZwDeleteFile.sys
 
