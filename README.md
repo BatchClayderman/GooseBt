@@ -148,7 +148,7 @@ A kernel driver to delete file forcibly in kernel mode. Currently, it could not 
 
 ## ZwOpReg.sys
 
-Scheduled
+Testing
 
 A kernel driver to operate the Registry in kernel mode. 
 
