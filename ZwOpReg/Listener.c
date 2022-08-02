@@ -12,6 +12,21 @@
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif
+#ifndef INFO_SEP
+#define INFO_SEP '\n'
+#endif
+#ifndef INFO_MEMBER_CNT
+#define INFO_MEMBER_CNT 6
+#endif
+#ifndef INFO_SEP_CNT
+#define INFO_SEP_CNT 5
+#endif
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
 #ifdef DeviceName
 #undef DeviceName
 #endif
@@ -44,6 +59,41 @@
 PDEVICE_OBJECT g_cdo = NULL;//控制设备
 
 
+/** 结构体 **/
+typedef struct
+{
+	char uOpType;// flag = 0
+	char uPath[MAX_PATH];// flag = 1
+	char uSubKeyType;// flag = 2 (fveh)
+	char uSubKey[MAX_PATH];// flag = 3
+	char uValueType;// flag = 4
+	char uValue[MAX_PATH];// flag = 5
+} ZwOpRegStruct;
+
+BOOLEAN isValidStructer(char buffer[], int newline_index[INFO_MEMBER_CNT], ULONG inlen)
+{
+	if (inlen >= MAX_PATH << 2)
+		return FALSE;
+	newline_index[INFO_MEMBER_CNT - 1] = inlen;
+	ULONG cnt = 0;
+	for (ULONG i = 0; i < inlen; ++i)
+		if (INFO_SEP == buffer[i])
+		{
+			if (cnt >= INFO_SEP_CNT)//分隔符数量太多
+				return FALSE;
+			newline_index[cnt++] = i;
+		}
+	if (INFO_SEP_CNT != cnt)//分隔符数量太少
+		return FALSE;
+	if (newline_index[0] != 1 || newline_index[2] - newline_index[1] != 1 || newline_index[4] - newline_index[3] != 0)//单独的一个字符
+		return FALSE;
+	for (int i = 1; i < INFO_MEMBER_CNT - 1; ++i)//各个数据长度（从 1 开始检查即可）
+		if (newline_index[i + 1] - newline_index[i] > MAX_PATH)
+			return FALSE;
+	return TRUE;
+}
+
+
 /** 通信函数 **/
 NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 {
@@ -68,74 +118,65 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 			switch (irpsp->Parameters.DeviceIoControl.IoControlCode)
 			{
 			case CWK_DVC_SEND_STR:
-				ASSERT(buffer != NULL && inlen < MAX_PATH&& inlen > 0 && 0 == outlen);
-				if (NULL == buffer || inlen >= MAX_PATH || inlen <= 0 || 0 != outlen)
+				ASSERT(buffer != NULL && inlen < MAX_PATH << 2 && inlen > 0 && 0 == outlen);
+				if (NULL == buffer || inlen >= MAX_PATH << 2 || inlen <= 0 || 0 != outlen)
 				{
-					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH && inlen > 0 && 0 == outlen)", _ZwOpReg_H);
+					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH << 2 && inlen > 0 && 0 == outlen)", _ZwOpReg_H);
 					break;
 				}
 				short int choice = 0;//请求方案
-				char bufIN[MAX_PATH] = { 0 };
-				strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), (char*)buffer);
-				if (strlen(bufIN) > 4//防止出错
-					&& (bufIN[0] == 'A' || bufIN[0] == 'a')
-					&& (bufIN[1] == 'D' || bufIN[1] == 'd')
-					&& (bufIN[2] == 'D' || bufIN[2] == 'd')
-					&& (bufIN[3] == ' ')
-					)// add 指令
+				char bufIN[MAX_PATH << 2] = { 0 };
+				int cur_index = 0, newline_index[INFO_MEMBER_CNT] = { 0 };
+				strcpy_s(bufIN, inlen, (char*)buffer);
+				for (ULONG i = 0; i < inlen; ++i)
+					if (bufIN[i] == '\n')
+						DbgPrint("%s->\'\\n\'\n", _ZwOpReg_H);
+					else
+						DbgPrint("%s->%c\n", _ZwOpReg_H, bufIN[i]);
+				if (!isValidStructer(bufIN, newline_index, inlen))//检查是否合法并获得分割位置
 				{
-					choice = 1;//设置 /add
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
-					DbgPrint("%s->GetWmirMsg()->add(\"%s\")\n", _ZwOpReg_H, bufIN);
-				}
-				else if (strlen(bufIN) > 4//防止出错
-					&& (bufIN[0] == 'D' || bufIN[0] == 'd')
-					&& (bufIN[1] == 'E' || bufIN[1] == 'e')
-					&& (bufIN[2] == 'L' || bufIN[2] == 'l')
-					&& (bufIN[3] == ' ')
-					)// del 指令
-				{
-					choice = 2;//设置 del
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
-					DbgPrint("%s->GetWmirMsg()->del(\"%s\")\n", _ZwOpReg_H, bufIN);
-				}
-				else if (strlen(bufIN) > 4//防止出错
-					&& (bufIN[0] == 'S' || bufIN[0] == 's')
-					&& (bufIN[1] == 'E' || bufIN[1] == 'e')
-					&& (bufIN[2] == 'T' || bufIN[2] == 't')
-					&& (bufIN[3] == ' ')
-					)// set 指令
-				{
-					choice = 3;//设置 set
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
-					DbgPrint("%s->GetWmirMsg()->set(\"%s\")\n", _ZwOpReg_H, bufIN);
-				}
-				else if (strlen(bufIN) > 6//防止出错
-					&& (bufIN[0] == 'Q' || bufIN[0] == 'q')
-					&& (bufIN[1] == 'U' || bufIN[1] == 'u')
-					&& (bufIN[2] == 'E' || bufIN[2] == 'e')
-					&& (bufIN[3] == 'R' || bufIN[3] == 'r')
-					&& (bufIN[4] == 'Y' || bufIN[4] == 'y')
-					&& (bufIN[5] == ' ')
-					)// query 指令
-				{
-					choice = 4;//设置 query
-					strcpy_s(bufIN, sizeof(bufIN) / sizeof(char), &bufIN[4]);
-					DbgPrint("%s->GetWmirMsg()->query\"%s\")\n", _ZwOpReg_H, bufIN);
-				}
-				else
 					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwOpReg_H, bufIN);//无效指令充当接收信息
+					break;
+				}
+
+				/* 开始切割收到的数据 */
+				ZwOpRegStruct regInfo = { '0', { 0 }, '0', { 0 }, '0', { 0 } };
+				regInfo.uOpType = bufIN[0];
+				cur_index = 0;
+				for (int i = newline_index[0] + 1; i < newline_index[1]; ++i)
+					regInfo.uPath[cur_index++] = bufIN[i];
+				regInfo.uSubKeyType = bufIN[newline_index[1] + 1];
+				cur_index = 0;
+				for (int i = newline_index[2] + 1; i < newline_index[3]; ++i)
+					regInfo.uSubKey[cur_index++] = bufIN[i];
+				regInfo.uValueType = bufIN[newline_index[3] + 1];
+				cur_index = 0;
+				for (int i = newline_index[4] + 1; i < newline_index[5]; ++i)
+					regInfo.uSubKey[cur_index++] = bufIN[i];
+
+				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uOpType);
+				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uPath);
+				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uSubKeyType);
+				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uSubKey);
+				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uValueType);
+				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uValue);
+
 				switch (choice)
 				{
 				case 1://执行 add
+					DbgPrint("%s->GetWmirMsg()->add\n", _ZwOpReg_H);
 					break;
 				case 2://执行 del
+					DbgPrint("%s->GetWmirMsg()->del\n", _ZwOpReg_H);
 					break;
 				case 3://执行 set
+					DbgPrint("%s->GetWmirMsg()->set\n", _ZwOpReg_H);
 					break;
 				case 4://执行 query
+					DbgPrint("%s->GetWmirMsg()->query\n", _ZwOpReg_H);
 					break;
 				default:
+					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwOpReg_H, bufIN);//无效指令充当接收信息
 					break;
 				}
 				break;

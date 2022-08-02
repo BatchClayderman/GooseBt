@@ -39,10 +39,6 @@
 #else
 #define GetFilePathFromHandle GetFilePathFromHandleA
 #endif
-#ifdef NT_SUCCESS
-#undef NT_SUCCESS
-#endif
-#define NT_SUCCESS(status)                   (status == (NTSTATUS)0x00000000L)
 #define STATUS_INFO_LENGTH_MISMATCH          ((NTSTATUS)0xC0000004L)
 #define STATUS_BUFFER_OVERFLOW               ((NTSTATUS)0x80000005L)
 #define FileNameInformation                  ((FILE_INFORMATION_CLASS)9)
@@ -92,6 +88,120 @@ EXTERN_C BOOL GetFilePathFromHandleA(HANDLE hFile, LPSTR  lpszPath, UINT cchMax)
 #endif//DriverConnection_H
 
 
+class WmirType
+{
+private:
+	_TCHAR uOpType = '0';// flag = 0
+	_TCHAR uPath[MAX_PATH] = { 0 };// flag = 1
+	_TCHAR uSubKeyType = '0';// flag = 2 (fveh)
+	_TCHAR uSubKey[MAX_PATH] = { 0 };// flag = 3
+	_TCHAR uValueType = '0';// flag = 4
+	_TCHAR uValue[MAX_PATH] = { 0 };// flag = 5
+
+public:
+	_TCHAR allMsg[MAX_PATH << 2] = { 0 };
+	void setOpType(_TCHAR tch)
+	{
+		this->uOpType = tch;
+		return;
+	}
+	void setPath(_TCHAR path[])
+	{
+		lstrcpy(this->uPath, path);
+		return;
+	}
+	bool fromCommandline(int argc, _TCHAR* argv[])
+	{
+		lstrcpy(uPath, argv[2]);
+		short int flag = 0;
+		for (int i = 3; i < argc; ++i)
+		{
+			if (0 == flag && (0 == _wcsicmp(argv[i], L"/v") || 0 == _wcsicmp(argv[i], L"-v")))
+			{
+				if ('0' != this->uSubKeyType)
+					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
+				this->uSubKeyType = 'v';
+				flag = 3;//下一个命令行参数应当为键名称
+			}
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/ve") || 0 == _wcsicmp(argv[i], L"-ve")))
+			{
+				if ('0' != this->uSubKeyType)
+					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
+				this->uSubKeyType = 'e';//注意没有下一个参数
+			}
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/f") || 0 == _wcsicmp(argv[i], L"-f")))
+			{
+				if ('0' != this->uSubKeyType)
+					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
+				this->uSubKeyType = 'f';
+				flag = 3;//下一个命令行参数应当为键名称
+			}
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/t") || 0 == _wcsicmp(argv[i], L"-t")))
+			{
+				if ('0' != this->uValueType)
+					wcout << L"警告：指定值类型的参数重复！" << endl;
+				flag = 4;//下一个命令行参数应当为值类型
+			}
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/d") || 0 == _wcsicmp(argv[i], L"-d")))
+			{
+				if (0 != this->uValue[0])
+					wcout << L"警告：重复设定值！" << endl;
+				flag = 5;//下一个命令行参数应当为值内容
+			}
+			else
+				switch (flag)
+				{
+				case 3://键名称
+					lstrcpy(this->uSubKey, argv[i]);
+					flag = 0;//重置参数
+					break;
+				case 4://值类型
+					if (0 == _wcsicmp(argv[i], L"REG_SZ") || 0 == _wcsicmp(argv[i], L"S"))
+						this->uValueType = 'S';
+					else if (0 == _wcsicmp(argv[i], L"REG_BINARY") || 0 == _wcsicmp(argv[i], L"B"))
+						this->uValueType = 'B';
+					else if (0 == _wcsicmp(argv[i], L"REG_DWORD") || 0 == _wcsicmp(argv[i], L"D"))
+						this->uValueType = 'D';
+					else if (0 == _wcsicmp(argv[i], L"REG_QWORD") || 0 == _wcsicmp(argv[i], L"Q"))
+						this->uValueType = 'Q';
+					else if (0 == _wcsicmp(argv[i], L"REG_MULTI_SZ") || 0 == _wcsicmp(argv[i], L"M"))
+						this->uValueType = 'M';
+					else if (0 == _wcsicmp(argv[i], L"REG_EXPAND_SZ") || 0 == _wcsicmp(argv[i], L"E"))
+						this->uValueType = 'E';
+					else if (0 == _wcsicmp(argv[i], L"REG_NONE") || 0 == _wcsicmp(argv[i], L"N"))
+						this->uValueType = 'N';
+					else
+						return false;
+					flag = 0;//重置参数
+					break;
+				case 5://值内容
+					lstrcpy(this->uValue, argv[i]);
+					flag = 0;//重置参数
+					break;
+				default://非法参数
+					return false;
+				}
+		}
+		if (0 != flag)//参数没处理完
+			return false;
+		//if ('0' == this->uSubKeyType)
+		//	this->uSubKeyType = 'e';//默认值
+		if ('0' == this->uValueType)
+			this->uSubKeyType = 'S';//默认值
+		return true;
+	}
+	void generateDriverMsg()
+	{
+		for (int i = 0; i < MAX_PATH << 2; ++i)//清空
+			this->allMsg[i] = 0;
+		wsprintf(allMsg, L"%c\n%s\n%c\n%s\n%c\n%s", this->uOpType, this->uPath, this->uSubKeyType, this->uSubKey, this->uValueType, this->uValue);
+#ifdef _DEBUG
+		wcout << this->allMsg << endl << endl;
+#endif
+		return;
+	}
+};
+
 /* 与驱动通信函数 */
 WCHAR* CCharToLpcwstr(const char* strings)//转换宽字符
 {
@@ -118,21 +228,21 @@ int DriverConnector(_TCHAR* msg, const _TCHAR* PipeName)
 	device = CreateFileW(PipeName, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
 	if (device == INVALID_HANDLE_VALUE)
 	{
-		wcout << L"错误：与驱动通讯时发生异常！（" << msg << L"）" << endl;
+		wcout << L"\a错误：与驱动通讯时发生异常！" << endl;
 		return EXIT_FAILURE;
 	}
 
 	/* 发送指令 */
-	char tmp[MAX_PATH] = { 0 };
+	char tmp[MAX_PATH << 2] = { 0 };
 	TcharToChar(msg, tmp);
 	if (DeviceIoControl(device, CWK_DVC_SEND_STR, tmp, (DWORD)(strlen(tmp)), NULL, 0, &ret_len, 0))
-		wcout << L"向驱动发送操作文件“" << msg << L"”请求成功！" << endl;
+		wcout << L"向驱动发送操作注册表请求成功！" << endl;
 	else
 	{
-		cout << "\a错误：向驱动发送信息时发生异常！（" << msg << "）" << endl;
+		wcout << L"\a错误：向驱动发送信息时发生异常！" << endl;
 		ret = EXIT_FAILURE;
 	}
-
+	
 	CloseHandle(device);//记得关闭
 	return ret;
 }
@@ -141,6 +251,20 @@ int DriverConnector(_TCHAR* msg, const _TCHAR* PipeName)
 /* 帮助 */
 void addHelp()
 {
+	wcout << endl << L"描述：向注册表中增加项或键。" << endl;
+	wcout << endl << L"wmir add [注册表路径] [子项、子键或默认值] ..." << endl << endl;
+	wcout << L"可用参数列表：" << endl;
+	wcout << L"\t[/v [键名称]|/ve|/f [项名称]]\t设定为子项、子键或默认值名称" << endl;
+	wcout << L"\t/t [值类型]\t\t\t值类型" << endl;
+	wcout << L"\t/d [值内容]\t\t\t值内容" << endl << endl;
+	wcout << L"可用的值类型：" << endl;
+	wcout << L"\tS = REG_SZ\t\t字符串值（默认）" << endl;
+	wcout << L"\tB = REG_BINARY\t\t二进制值" << endl;
+	wcout << L"\tD = REG_DWORD\t\t32 位 DWORD 值" << endl;
+	wcout << L"\tQ = REG_QWORD\t\t64 位 QWORD 值" << endl;
+	wcout << L"\tM = REG_MULTI_SZ\t多字符串值" << endl;
+	wcout << L"\tE = REG_EXPAND_SZ\t可扩充字符串值" << endl;
+	wcout << L"\tN = REG_NONE\t\t无类型值" << endl << endl;
 	return;
 }
 
@@ -184,19 +308,34 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (argc >= 4)//参数数量正确
 	{
-		if (0 == _wcsicmp(argv[1], L"add")
-			|| 0 == _wcsicmp(argv[1], L"del")
-			|| 0 == _wcsicmp(argv[1], L"set")
-			|| 0 == _wcsicmp(argv[1], L"query")
-		)//攻击类
+		WmirType wrt;
+		if (0 == _wcsicmp(argv[1], L"add"))
+			wrt.setOpType(L'1');
+		else if (0 == _wcsicmp(argv[1], L"del") || 0 == _wcsicmp(argv[1], L"delete"))
+			wrt.setOpType(L'2');
+		else if (0 == _wcsicmp(argv[1], L"set"))
+			wrt.setOpType(L'3');
+		else if (0 == _wcsicmp(argv[1], L"query"))
+			wrt.setOpType(L'4');
+		else
 		{
-			;
+			wcout << L"\a错误：命令行首参数不正确！" << endl;
+			return EOF;
 		}
+		if (!wrt.fromCommandline(argc, argv))
+		{
+			wcout << L"\a错误：命令行参数不正确！" << endl;
+			return EOF;
+		}
+		wrt.setPath(argv[2]);
+		wrt.generateDriverMsg();
+		DriverConnector(wrt.allMsg, CWK_DEV_SYM_R);
+		return EXIT_SUCCESS;
 	}
 	else if (3 == argc
 		&& (
-			0 == _wcsicmp(argv[1], L"/?") || 0 == _wcsicmp(argv[1], L"-?")
-			|| 0 == _wcsicmp(argv[1], L"/help") || 0 == _wcsicmp(argv[1], L"-help")
+			0 == _wcsicmp(argv[2], L"/?") || 0 == _wcsicmp(argv[2], L"-?")
+			|| 0 == _wcsicmp(argv[2], L"/help") || 0 == _wcsicmp(argv[2], L"-help")
 		)
 	)//子帮助类
 	{
@@ -210,7 +349,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			queryHelp();
 		else
 		{
-			wcout << L"\a错误：命令行参数不正确！" << endl;
+			wcout << L"\a错误：命令行首参数不正确！" << endl;
 			return EOF;
 		}
 		return EXIT_SUCCESS;

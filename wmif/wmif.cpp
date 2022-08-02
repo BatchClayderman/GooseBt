@@ -666,7 +666,7 @@ int DriverConnector(_TCHAR* msg, const _TCHAR* PipeName)
 		wcout << L"向驱动发送操作文件“" << msg << L"”请求成功！" << endl;
 	else
 	{
-		cout << "\a错误：向驱动发送信息时发生异常！（" << msg << "）" << endl;
+		wcout << L"\a错误：向驱动发送信息时发生异常！（" << msg << L"）" << endl;
 		ret = EXIT_FAILURE;
 	}
 

@@ -119,6 +119,9 @@
 #ifndef min
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif//最小值
+#ifndef NT_SUCCESS
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#endif//NT_SUCCESS
 #ifndef _WIN32_WINNT
 #if EQ(Platform, TRUE)
 #define _WIN32_WINNT 0x0001
@@ -167,15 +170,6 @@
 #undef PLF
 #endif
 
-#ifndef LogName
-#define LogName "wmipLog.log"
-#endif
-#ifndef WmipTextTitle
-#define WmipTextTitle TEXT("wmip")
-#endif
-#ifndef MAX_PATH
-#define MAX_PATH 260
-#endif
 #ifndef EXIT_OUT_OF_SCHEDULE
 #define EXIT_OUT_OF_SCHEDULE 9009
 #endif
@@ -210,6 +204,22 @@
 #ifndef EXIT_DRIVER_ERROR
 #define EXIT_DRIVER_ERROR (-5)
 #endif
+
+#ifndef WmipTextTitle
+#define WmipTextTitle TEXT("wmip")
+#endif
+#ifndef LogName
+#define LogName "wmipLog.log"
+#endif
+#ifndef L_DriverLoader
+#define L_DriverLoader L"DriverLoader.exe"
+#endif
+#ifndef L_ZwTerminateProcess
+#define L_ZwTerminateProcess L"ZwTerminateProcess.sys"
+#endif
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
 #ifndef Large
 #define Large 8000
 #endif
@@ -227,6 +237,18 @@
 #endif
 #ifndef gapTime
 #define gapTime 60000
+#endif
+
+#ifndef ClearConsoleScreen
+#define ClearConsoleScreen system("cls");
+#endif
+#ifndef CallConsolePause
+#define CallConsolePause system("pause>nul");
+#endif
+#ifndef ClearNotConsoleScreen
+#define ClearNotConsoleScreen                                            \
+for (int notConsoleLine = 0; notConsoleLine < 120; ++notConsoleLine)     \
+	cout << endl;
 #endif
 
 #ifndef OBJ_INHERIT
@@ -693,14 +715,14 @@ DECLARE_HANDLE(HZIP);
 }
 #define NEEDOUT                     \
 {                                   \
-	if (m == 0)                     \
+	if (0 == m)                     \
 	{                               \
 		WRAP                        \
-			if (m == 0)             \
+			if (0 == m)             \
 			{                       \
 				FLUSH               \
 					WRAP            \
-					if (m == 0)     \
+					if (0 == m)     \
 						LEAVE       \
 			}                       \
 	}                               \
@@ -709,10 +731,10 @@ DECLARE_HANDLE(HZIP);
 #define OUTBYTE(a)        \
 {                         \
 	*q++ = (Byte)(a);     \
-	m--;                  \
+	--m;                  \
 }
 #define LOAD {LOADIN LOADOUT}
-#define ERR_RETURN(strm,err) \
+#define ERR_RETURN(strm,err)     \
 	return (strm->msg = (char*)ERR_MSG(err), (err))
 #define ERR_MSG(err) z_errmsg[Z_NEED_DICT-(err)]
 #define zmemzero(dest, len) memset(dest, 0, len)
@@ -746,34 +768,34 @@ DECLARE_HANDLE(HZIP);
 	k -= c << 3;                       \
 }
 #define CRC_DO1(buf) crc = crc_table[((int)crc ^ (*buf++)) & 0xff] ^ (crc >> 8);
-#define CRC_DO2(buf)  CRC_DO1(buf); CRC_DO1(buf);
-#define CRC_DO4(buf)  CRC_DO2(buf); CRC_DO2(buf);
-#define CRC_DO8(buf)  CRC_DO4(buf); CRC_DO4(buf);
+#define CRC_DO2(buf) CRC_DO1(buf); CRC_DO1(buf);
+#define CRC_DO4(buf) CRC_DO2(buf); CRC_DO2(buf);
+#define CRC_DO8(buf) CRC_DO4(buf); CRC_DO4(buf);
 #define CRC32(c,b) (crc_table[((int)(c)^(b))&0xff]^((c)>>8))
-#define AD_DO1(buf,i)  {s1 += buf[i]; s2 += s1;}
-#define AD_DO2(buf,i)  AD_DO1(buf,i); AD_DO1(buf,i+1);
-#define AD_DO4(buf,i)  AD_DO2(buf,i); AD_DO2(buf,i+2);
-#define AD_DO8(buf,i)  AD_DO4(buf,i); AD_DO4(buf,i+4);
-#define AD_DO16(buf)   AD_DO8(buf,0); AD_DO8(buf,8);
+#define AD_DO1(buf,i) { s1 += buf[i]; s2 += s1; }
+#define AD_DO2(buf,i) AD_DO1(buf,i); AD_DO1(buf,i+1);
+#define AD_DO4(buf,i) AD_DO2(buf,i); AD_DO2(buf,i+2);
+#define AD_DO8(buf,i) AD_DO4(buf,i); AD_DO4(buf,i+4);
+#define AD_DO16(buf) AD_DO8(buf,0); AD_DO8(buf,8);
 #define IM_NEEDBYTE        \
 {                          \
 	if (z->avail_in==0)    \
 		return r;          \
 	r=f;                   \
 }
-#define IM_NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
+#define IM_NEXTBYTE (z->avail_in--, z->total_in++, *z->next_in++)
 #ifndef zmalloc
 void* zmalloc(unsigned int len)
 {
 	char* buf = new char[len + 32];
-	for (int i = 0; i < 16; i++)
+	for (int i = 0; i < 16; ++i)
 	{
 		buf[i] = i;
 		buf[len + 31 - i] = i;
 	}
 	*((unsigned int*)buf) = len;
 	_TCHAR c[Small << 1];
-	wsprintf(c, L"malloc 0x%lx  - %lu", int(buf + 16), len);
+	wsprintf(c, L"malloc 0x%lx - %lu", int(buf + 16), len);
 	OutputDebugString(c);
 	return buf + 16;
 }
@@ -782,12 +804,12 @@ void* zmalloc(unsigned int len)
 void zfree(void* buf)
 {
 	_TCHAR c[Small << 1];
-	wsprintf(c, L"free   0x%lx", int(buf));
+	wsprintf(c, L"free 0x%lx", int(buf));
 	OutputDebugString(c);
 	char* p = ((char*)buf) - 16;
 	unsigned int len = *((unsigned int*)p);
 	bool blown = false;
-	for (int i = 0; i < 16; i++)
+	for (int i = 0; i < 16; ++i)
 	{
 		char lo = p[i];
 		char hi = p[len + 31 - i];
@@ -795,7 +817,7 @@ void zfree(void* buf)
 			blown = true;
 	}
 	if (blown)
-		OutputDebugString(L"BLOWN!!!");
+		OutputDebugString(L"BLOWN!! ");
 	delete[] p;
 }
 #endif
@@ -825,14 +847,16 @@ void ZFREE(z_streamp strm, voidpf addr)
 	(ULONG)CTL_CODE(          \
 	0x00000022,               \
 	0x911,0,                  \
-	FILE_WRITE_DATA)
+	FILE_WRITE_DATA           \
+)
 
 /* 从驱动读取一个字符串 */
 #define  CWK_DVC_RECV_STR     \
 	(ULONG)CTL_CODE(          \
 	FILE_DEVICE_UNKNOWN,      \
 	0x912,METHOD_BUFFERED,    \
-	FILE_READ_DATA)
+	FILE_READ_DATA            \
+)
 #endif//DriverConnection_H
 
 
@@ -853,7 +877,7 @@ public:
 	}
 	void RaiseError()//退出
 	{
-		cout << "Without adequate memory, this process is exiting." << endl;
+		cout << "Without adequate memory, this process is now exiting." << endl;
 		Sleep(DefaultTime);
 		exit(EXIT_MEMERROR);
 	}
@@ -903,7 +927,7 @@ typedef void* voidpf;
 typedef void* voidp;
 typedef long z_off_t;
 typedef voidpf(*alloc_func) (voidpf opaque, uInt items, uInt size);
-typedef void  (*free_func) (voidpf opaque, voidpf address);
+typedef void (*free_func) (voidpf opaque, voidpf address);
 typedef unsigned __int32 lutime_t;
 typedef uLong(*check_func) (uLong check, const Byte* buf, uInt len);
 typedef unsigned char uch;
@@ -978,7 +1002,7 @@ StackType Push(SqStack& S, ProcessNode elem)//元素压栈
 	else
 	{
 		S.base[S.top - S.base] = elem;
-		S.top++;
+		++S.top;
 		return true;
 	}
 }
@@ -990,7 +1014,7 @@ StackType Pop(SqStack& S, ProcessNode& elem)//元素出栈
 	else
 	{
 		elem = S.base[S.top - S.base - 1];
-		S.top--;
+		--S.top;
 		return true;
 	}
 }
@@ -1151,10 +1175,10 @@ TreeType BuildTree(TreeNode& Root)//递归建立多叉树
 	if (Root.data.ProcessIDNode == 0)//排除 PID = 0 的无限递归
 		return false;
 	int result = PIDFinder(Root.data.ProcessIDNode, false);
-	if (result == -1)
+	if (-1 == result)
 		return false;
 	while (result > 0 && Lists.PNode[result - 1].ParentIDNode == Lists.PNode[result].ParentIDNode)//找到第一个子进程
-		result--;
+		--result;
 	TreeNode* NewTreeNode = (struct TreeNode*)malloc(sizeof(struct TreeNode));//处理首孩子结点
 	if (!NewTreeNode)
 	{
@@ -1174,7 +1198,7 @@ TreeType BuildTree(TreeNode& Root)//递归建立多叉树
 			state = 30;
 			return false;
 		}
-		result++;
+		++result;
 		NewChildNode->data = Lists.PNode[result];
 		NewChildNode->FirstChild = NULL;
 		NewChildNode->NextSibling = NULL;
@@ -1259,7 +1283,7 @@ LinkType AddNode(int RPID, int RPPID, unsigned long long int RRTime, _TCHAR* RRN
 	lstrcpy(pAdd->data.ImgNmae, RRName);
 	pAdd->next = NULL;
 	pCur->next = pAdd;
-	NodeCount++;
+	++NodeCount;
 	return true;
 }
 
@@ -1278,7 +1302,7 @@ LinkType DeleteNode(TimeNodes* RPID)//删除元素
 	pCur->next = pDel->next;
 	delete pDel;
 	pDel = NULL;
-	NodeCount--;
+	--NodeCount;
 	return true;
 }
 
@@ -2017,6 +2041,7 @@ int DriverConnector(char* msg, bool test)
 /* Windows Hook */
 LRESULT __stdcall CBTHookProc1(long nCode, WPARAM wParam, LPARAM lParam)//并发编程 Funtion1
 {
+	UNREFERENCED_PARAMETER(lParam);
 	if (nCode == HCBT_ACTIVATE)
 	{
 		SetDlgItemText((HWND)wParam, IDYES, RunThread == 2 ? TEXT("自动刷新") : TEXT("手动刷新"));
@@ -2029,6 +2054,7 @@ LRESULT __stdcall CBTHookProc1(long nCode, WPARAM wParam, LPARAM lParam)//并发
 
 LRESULT __stdcall CBTHookProc2(long nCode, WPARAM wParam, LPARAM lParam)//并发编程 FunctionC
 {
+	UNREFERENCED_PARAMETER(lParam);
 	if (nCode == HCBT_ACTIVATE)
 	{
 		SetDlgItemText((HWND)wParam, IDABORT, TEXT("循环提权"));
@@ -2039,6 +2065,7 @@ LRESULT __stdcall CBTHookProc2(long nCode, WPARAM wParam, LPARAM lParam)//并发
 
 LRESULT __stdcall CBTHookProc3(long nCode, WPARAM wParam, LPARAM lParam)//禁止创建进程
 {
+	UNREFERENCED_PARAMETER(lParam);
 	if (nCode == HCBT_ACTIVATE)
 	{
 		SetDlgItemText((HWND)wParam, IDCANCEL, TEXT("不再提示"));
@@ -2453,7 +2480,7 @@ APIType CallErrorScreen()//蓝屏
 	pdef_NtRaiseHardError NtCall2 = (pdef_NtRaiseHardError)lpFuncAddress2;
 	NTSTATUS NtRet = NtCall(19, TRUE, FALSE, &bEnabled);
 	NtCall2(STATUS_FLOAT_MULTIPLE_FAULTS, 0, 0, 0, 6, &uResp);
-	return TRUE;
+	return NT_SUCCESS(NtRet) ? TRUE : FALSE;
 }
 
 APIType CALLBACK lpEnumFunc(HWND hwnd, LPARAM lParam)//窗体
@@ -2477,7 +2504,7 @@ APIType GetHWndsByProcessID(DWORD processID, vector<HWND>& vecHWnds)
 
 HANDLE WINAPI MyOpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId)//MyOpenProcess 函数的实现
 {
-	if (_getpid() == dwProcessId)//如果要打开本进程，返回 NULL
+	if ((DWORD)_getpid() == dwProcessId)//如果要打开本进程，返回 NULL
 		return NULL;
 	return pRealOpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId);
 }
@@ -2504,7 +2531,7 @@ APIType IatHook(
 		char* OurDllName = (char*)(IMPORT->Name + pBegin2);
 		if (0 == _strcmpi(DllName, OurDllName))
 			break;
-		IMPORT++;
+		++IMPORT;
 	}
 	/* 查找相同的 API 函数 */
 	PIMAGE_IMPORT_BY_NAME pImportByName = NULL;
@@ -2541,8 +2568,8 @@ APIType IatHook(
 				break;
 			}
 		}
-		pOriginalThunk++;
-		pFirstThunk++;
+		++pOriginalThunk;
+		++pFirstThunk;
 	}
 	return TRUE;
 }
@@ -2737,23 +2764,23 @@ bool InsertSort(ProcessNode PNodeElem)//插入元素
 	for (i = Results.ProcessCount; i > index; --i)
 		Results.PNode[i] = Results.PNode[i - 1];
 	Results.PNode[i] = PNodeElem;
-	Results.ProcessCount++;
+	++Results.ProcessCount;
 	Results.ThreadCount += PNodeElem.ThreadCNode;
 	return true;
 }
 
 int match_string(string m_str, string w_str)//处理通配符
 {
-	transform(m_str.begin(), m_str.end(), m_str.begin(), tolower);//在 m_str 中匹配 w_str
+	transform(m_str.begin(), m_str.end(), m_str.begin(), tolower);//统一转小写处理
 	transform(w_str.begin(), w_str.end(), w_str.begin(), tolower);
-	size_t m_len = m_str.size(), w_len = w_str.size();
+	size_t m_len = m_str.size(), w_len = w_str.size();//在 m_str 中匹配 w_str
 	vector<vector<int> > b_dp(w_len + 1, vector<int>(m_len + 1, 0));//多加一行一列作为初始初值所用
 	b_dp[0][0] = 1;
-	for (size_t i = 1; i <= w_len; i++)
+	for (size_t i = 1; i <= w_len; ++i)
 	{
 		char ch = w_str[i - 1];
 		b_dp[i][0] = int(b_dp[i - 1][0] && (ch == '*'));//设置每次循环的初值，即当星号不出现在首位时，匹配字符串的初值都为false
-		for (size_t j = 1; j <= m_len; j++)
+		for (size_t j = 1; j <= m_len; ++j)
 		{
 			char ch2 = m_str[j - 1];
 			if (ch == '*')
@@ -2802,7 +2829,7 @@ void GetProcess()//获取进程
 		Lists.PNode[Lists.ProcessCount].ThreadCNode = pe32.cntThreads;
 		wcscpy_s(Lists.PNode[Lists.ProcessCount].PNameNode, pe32.szExeFile);
 		hProcess = Process32Next(hProceessnap, &pe32);
-		Lists.ProcessCount++;
+		++Lists.ProcessCount;
 		Lists.ThreadCount += pe32.cntThreads;
 		if (hProcess && Lists.ProcessCount >= Large)
 		{
@@ -2817,7 +2844,7 @@ void GetProcess()//获取进程
 
 void FindProcess()//查找进程
 {
-	system("cls");
+	ClearConsoleScreen
 	GetProcess();
 	int result = 0, i = 0;
 	if (Lists.ProcessCount <= 0)
@@ -2840,10 +2867,9 @@ void FindProcess()//查找进程
 		fflush(stdin);
 		if (scanf_s("%d", &ID_IN[i]) != 1 || ID_IN[i] < 0)
 			break;
-		result = PIDFinder(ID_IN[i], true);
+		result = PIDFinder(ID_IN[i++], true);
 		if (result != -1)
 			InsertSort(Lists.PNode[result]);
-		i++;
 	}
 	i = 0;
 	cout << endl << "说明：依照 Microsoft Windows 相关规定，进程名不区分大小写。" << endl;
@@ -2860,12 +2886,11 @@ void FindProcess()//查找进程
 			|| strcmp(Name_IN[i], "<") == 0 || strcmp(Name_IN[i], ">") == 0 || strcmp(Name_IN[i], "|") == 0
 			)
 			break;
-		NameFinder(Name_IN[i]);
-		i++;
+		NameFinder(Name_IN[i++]);
 	}
 	rewind(stdin);
 	fflush(stdin);
-	system("cls");
+	ClearConsoleScreen
 	if (Results.ProcessCount == 0)
 	{
 		cout << "输入为空或没有结果，" << states[28] << endl;
@@ -3492,7 +3517,7 @@ int inflate_codes(inflate_blocks_statef* s, z_streamp z, int r)
 						OUTBYTE(*f++)
 						if (f == s->end)
 							f = s->window;
-					c->len--;
+					--c->len;
 				}
 				c->mode = inflate_codes_mode::START;
 				break;
@@ -3507,8 +3532,8 @@ int inflate_codes(inflate_blocks_statef* s, z_streamp z, int r)
 					if (k < 16)
 						MessageBox(NULL, TEXT("代码占用了太多字节，请注意。"), WmipTextTitle, MB_OK | MB_ICONWARNING | MB_TOPMOST);
 					k -= 8;
-					n++;
-					p--;//确保可以有至少一个返回值
+					++n;
+					--p;//确保可以有至少一个返回值
 				}
 				FLUSH
 					if (s->read != s->write)
@@ -3931,7 +3956,7 @@ int huft_build(
 		{
 			while (k > w + l)//这里是长度为 k 位的哈夫曼码，值为 *p
 			{
-				h++;
+				++h;
 				w += l;//上一个表总是 l 位
 				z = g - w;//计算 <= l 位的最小大小表
 				z = (z > (uInt)l ? l : z);//表大小上限
@@ -3986,7 +4011,7 @@ int huft_build(
 			mask = (1 << w) - 1;//备份已完成的表
 			while ((i & mask) != x[h])
 			{
-				h--;//注意：不需要再更新表 q
+				--h;//注意：不需要再更新表 q
 				w -= l;
 				mask = (1 << w) - 1;
 			}
@@ -4115,7 +4140,7 @@ int InflateTreesFast(
 						)
 					);
 				*q++ = (Byte)t->base;
-				m--;
+				--m;
 				continue;
 			}
 		for (;;)//死循环
@@ -4164,9 +4189,9 @@ int InflateTreesFast(
 									else//正常复制
 									{
 										*q++ = *r++;
-										c--;
+										--c;
 										*q++ = *r++;
-										c--;
+										--c;
 										do
 										{
 											*q++ = *r++;
@@ -4176,9 +4201,9 @@ int InflateTreesFast(
 								else//正常复制
 								{
 									*q++ = *r++;
-									c--;
+									--c;
 									*q++ = *r++;
-									c--;
+									--c;
 									do
 									{
 										*q++ = *r++;
@@ -4211,7 +4236,7 @@ int InflateTreesFast(
 							"内部信息：* literal = '%c'\n" :
 							"内部信息：* literal = 0x%02x\n", t->base));
 					*q++ = (Byte)t->base;
-					m--;
+					--m;
 					break;
 				}
 			}
@@ -4241,21 +4266,21 @@ const uLong* get_crc_table()
 	return (const uLong*)crc_table;
 }
 
-uLong ucrc32(uLong crc, const Byte* buf, uInt len)
+uLong ucrc32(uLong crc, const Byte* zipBuffer, uInt len)
 {
-	if (buf == Z_NULL)
+	if (zipBuffer == Z_NULL)
 		return 0L;
 	crc ^= 0xffffffffL;
 	while (len >= 8)
 	{
-		CRC_DO8(buf);
+		CRC_DO8(zipBuffer);
 		len -= 8;
 	}
 	if (len)
 	{
 		do
 		{
-			CRC_DO1(buf);
+			CRC_DO1(zipBuffer);
 		} while (--len);
 	}
 	return crc ^ 0xffffffffL;
@@ -4282,11 +4307,11 @@ char zdecode(unsigned long* keys, char c)
 	return c;
 }
 
-uLong adler32(uLong adler, const Byte* buf, uInt len)
+uLong adler32(uLong adler, const Byte* zipBuffer, uInt len)
 {
 	unsigned long s1 = adler & 0xffff, s2 = (adler >> 16) & 0xffff;
-	int k;
-	if (buf == Z_NULL)
+	int k = 0;
+	if (Z_NULL == zipBuffer)
 		return 1L;
 	while (len > 0)
 	{
@@ -4294,15 +4319,15 @@ uLong adler32(uLong adler, const Byte* buf, uInt len)
 		len -= k;
 		while (k >= 16)
 		{
-			AD_DO16(buf);
-			buf += 16;
+			AD_DO16(zipBuffer);
+			zipBuffer += 16;
 			k -= 16;
 		}
 		if (k != 0)
 		{
 			do
 			{
-				s1 += *buf++;
+				s1 += *zipBuffer++;
 				s2 += s1;
 			} while (--k);
 		}//加个括号防止识别出错
@@ -4740,8 +4765,8 @@ uLong unzlocal_SearchCentralDir(LUFILE* fin)
 	uLong uMaxBack = 0xffff;//全局注释的最大大小
 	if (uMaxBack > uSizeFile)
 		uMaxBack = uSizeFile;
-	unsigned char* buf = (unsigned char*)zmalloc(BUFREADCOMMENT + 4);
-	if (buf == NULL)
+	unsigned char* zipBuffer = (unsigned char*)zmalloc(BUFREADCOMMENT + 4);
+	if (NULL == zipBuffer)
 		return 0xFFFFFFFF;
 	uLong uPosFound = 0xFFFFFFFF, uBackRead = 4;
 	while (uBackRead < uMaxBack)
@@ -4756,11 +4781,11 @@ uLong unzlocal_SearchCentralDir(LUFILE* fin)
 		uReadSize = ((BUFREADCOMMENT + 4) < (uSizeFile - uReadPos)) ? (BUFREADCOMMENT + 4) : (uSizeFile - uReadPos);
 		if (lufseek(fin, uReadPos, SEEK_SET) != 0)
 			break;
-		if (lufread(buf, (uInt)uReadSize, 1, fin) != 1)
+		if (lufread(zipBuffer, (uInt)uReadSize, 1, fin) != 1)
 			break;
 		for (i = (int)uReadSize - 3; (i--) >= 0;)
 		{
-			if (((*(buf + i)) == 0x50) && ((*(buf + i + 1)) == 0x4b) && ((*(buf + i + 2)) == 0x05) && ((*(buf + i + 3)) == 0x06))
+			if (((*(zipBuffer + i)) == 0x50) && ((*(zipBuffer + i + 1)) == 0x4b) && ((*(zipBuffer + i + 2)) == 0x05) && ((*(zipBuffer + i + 3)) == 0x06))
 			{
 				uPosFound = uReadPos + i;
 				break;
@@ -4769,8 +4794,8 @@ uLong unzlocal_SearchCentralDir(LUFILE* fin)
 		if (uPosFound != 0)
 			break;
 	}
-	if (buf)
-		zfree(buf);
+	if (zipBuffer)
+		zfree(zipBuffer);
 	return
 		uPosFound;
 }
@@ -5049,7 +5074,7 @@ int unzGoToNextFile(unzFile file)
 		return UNZ_END_OF_LIST_OF_FILE;
 	s->pos_in_central_dir += SIZECENTRALDIRITEM + s->cur_file_info.size_filename +
 		s->cur_file_info.size_file_extra + s->cur_file_info.size_file_comment;
-	s->num_file++;
+	++s->num_file;
 	err = unzlocal_GetCurrentFileInfoInternal(file, &s->cur_file_info,
 		&s->cur_file_info_internal,
 		NULL, 0, NULL, 0, NULL, 0);
@@ -5224,7 +5249,7 @@ int unzOpenCurrentFile(unzFile file, const char* password)
 	return UNZ_OK;
 }
 
-int unzReadCurrentFile(unzFile file, voidp buf, unsigned len, bool* reached_eof)
+int unzReadCurrentFile(unzFile file, voidp zipBuffer, unsigned len, bool* reached_eof)
 {
 	int err = UNZ_OK;
 	uInt iRead = 0;
@@ -5239,7 +5264,7 @@ int unzReadCurrentFile(unzFile file, voidp buf, unsigned len, bool* reached_eof)
 		return UNZ_END_OF_LIST_OF_FILE;
 	if (len == 0)
 		return 0;
-	pfile_in_zip_read_info->stream.next_out = (Byte*)buf;
+	pfile_in_zip_read_info->stream.next_out = (Byte*)zipBuffer;
 	pfile_in_zip_read_info->stream.avail_out = (uInt)len;
 	if (len > pfile_in_zip_read_info->rest_read_uncompressed)
 		pfile_in_zip_read_info->stream.avail_out = (uInt)pfile_in_zip_read_info->rest_read_uncompressed;
@@ -5266,9 +5291,9 @@ int unzReadCurrentFile(unzFile file, voidp buf, unsigned len, bool* reached_eof)
 			pfile_in_zip_read_info->stream.avail_in = (uInt)uReadThis;
 			if (pfile_in_zip_read_info->encrypted)
 			{
-				char* buf = (char*)pfile_in_zip_read_info->stream.next_in;
+				char* cZipBuffer = (char*)pfile_in_zip_read_info->stream.next_in;
 				for (unsigned int i = 0; i < uReadThis; ++i)
-					buf[i] = zdecode(pfile_in_zip_read_info->keys, buf[i]);
+					cZipBuffer[i] = zdecode(pfile_in_zip_read_info->keys, cZipBuffer[i]);
 			}
 		}
 		unsigned int uDoEncHead = pfile_in_zip_read_info->encheadleft;
@@ -5367,7 +5392,7 @@ int unzeof(unzFile file)
 		return 0;
 }
 
-int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len)
+int unzGetLocalExtrafield(unzFile file, voidp zipBuffer, unsigned len)
 {
 	unz_s* s;
 	file_in_zip_read_info_s* pfile_in_zip_read_info;
@@ -5381,7 +5406,7 @@ int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len)
 		return UNZ_PARAMERROR;
 	size_to_read = (pfile_in_zip_read_info->size_local_extrafield -
 		pfile_in_zip_read_info->pos_local_extrafield);
-	if (buf == NULL)
+	if (NULL == zipBuffer)
 		return (int)size_to_read;
 	if (len > size_to_read)
 		read_now = (uInt)size_to_read;
@@ -5392,7 +5417,7 @@ int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len)
 	if (lufseek(pfile_in_zip_read_info->file,
 		pfile_in_zip_read_info->offset_local_extrafield + pfile_in_zip_read_info->pos_local_extrafield, SEEK_SET) != 0)
 		return UNZ_ERRNO;
-	if (lufread(buf, (uInt)size_to_read, 1, pfile_in_zip_read_info->file) != 1)
+	if (lufread(zipBuffer, (uInt)size_to_read, 1, pfile_in_zip_read_info->file) != 1)
 		return UNZ_ERRNO;
 	return (int)read_now;
 }
@@ -5415,8 +5440,8 @@ int unzCloseCurrentFile(unzFile file)//关闭当前已解压文件
 	}
 	if (pfile_in_zip_read_info->read_buffer != 0)
 	{
-		void* buf = pfile_in_zip_read_info->read_buffer;
-		zfree(buf);
+		void* zipBuffer = pfile_in_zip_read_info->read_buffer;
+		zfree(zipBuffer);
 		pfile_in_zip_read_info->read_buffer = 0;
 	}
 	pfile_in_zip_read_info->read_buffer = NULL;
@@ -5488,7 +5513,7 @@ void EnsureDirectory(const TCHAR* rootdir, const TCHAR* dir)//确认目录
 	{
 		if (*c == '/' || *c == '\\')
 			lastslash = c;
-		c++;
+		++c;
 	}
 	const TCHAR* name = lastslash;
 	if (lastslash != dir)
@@ -5497,9 +5522,9 @@ void EnsureDirectory(const TCHAR* rootdir, const TCHAR* dir)//确认目录
 		memcpy(tmp, dir, sizeof(TCHAR) * (lastslash - dir));
 		tmp[lastslash - dir] = 0;
 		EnsureDirectory(rootdir, tmp);
-		name++;
+		++name;
 	}
-	TCHAR cd[Small];
+	TCHAR cd[Small] = { 0 };
 	*cd = 0;
 	if (rootdir != 0)
 		wcscpy_s(cd, rootdir);
@@ -5655,14 +5680,9 @@ ZRESULT TUnzip::Get(int index, ZIPENTRY* ze)
 			sfn += 2;
 			continue;
 		}
-		if (sfn[0] == '\\')
+		if ('\\' == sfn[0] || '/' == sfn[0])
 		{
-			sfn++;
-			continue;
-		}
-		if (sfn[0] == '/')
-		{
-			sfn++;
+			++sfn;
 			continue;
 		}
 		const TCHAR* c;
@@ -5881,9 +5901,9 @@ ZRESULT TUnzip::Unzip(int index, void* dst, unsigned int len, DWORD flags)
 		{
 			if (*c == '/' || *c == '\\')
 				name = c + 1;
-			c++;
+			++c;
 		}
-		TCHAR dir[Small];
+		TCHAR dir[Small] = { 0 };
 		wcscpy_s(dir, ufn);
 		if (name == ufn)
 			*dir = 0;
@@ -5965,7 +5985,7 @@ ZRESULT lasterrorU = ZR_OK;
 
 
 /* 解压 zip 的后续处理部分 */
-unsigned int FormatZipMessageU(ZRESULT code, TCHAR* buf, unsigned int len)
+unsigned int FormatZipMessageU(ZRESULT code, TCHAR* zipBuffer, unsigned int len)
 {
 	if (code == ZR_RECENT)
 		code = lasterrorU;
@@ -6039,13 +6059,13 @@ unsigned int FormatZipMessageU(ZRESULT code, TCHAR* buf, unsigned int len)
 		break;
 	}
 	unsigned int mlen = (unsigned int)_tcslen(msg);
-	if (buf == 0 || len == 0)
+	if (0 == zipBuffer || 0 == len)
 		return mlen;
 	unsigned int n = mlen;
 	if (n + 1 > len)
 		n = len - 1;
-	wcscpy_s(buf, n, msg);
-	buf[n] = 0;
+	wcscpy_s(zipBuffer, n, msg);
+	zipBuffer[n] = 0;
 	return mlen;
 }
 
@@ -6198,7 +6218,7 @@ ThreadControl ThreadControl1()
 			if (Results.ProcessCount != 0)
 			{
 				cout << "查找完毕，请按任意键返回。若要对进程进行操作，请到主界面选择功能 2。" << endl;
-				system("pause>nul");
+				CallConsolePause
 			}
 			RunThread += 10;
 			return ThreadControl1();
@@ -6244,8 +6264,8 @@ ThreadControl ThreadControl3()
 /* 通用子函数 OperateProcess */
 OperateProcess OperateProcess1(char* DllPath)//远程线程注入
 {
-	if (Results.ProcessCount == 0)
-		return EXIT_FAILURE;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecCount = 0;
 	cout << "开始对所选的 " << Results.ProcessCount << " 个进程注入模块“" << DllPath << "”，详细信息如下：" << endl << endl;
 	cout << "序号\t\tPID\t\t状态" << endl << "==========\t==========\t========================================" << endl << endl;
@@ -6253,8 +6273,8 @@ OperateProcess OperateProcess1(char* DllPath)//远程线程注入
 	{
 		injectit(DllPath, Results.PNode[i].ProcessIDNode);
 		cout << i + 1 << "\t\t" << Results.PNode[i].ProcessIDNode << "\t\t" << states[state] << endl;
-		if (state == 0)
-			SecCount++;
+		if (0 == state)
+			++SecCount;
 	}
 	cout << endl << endl << "已成功注入 " << SecCount << " / " << Results.ProcessCount << " 个进程。" << endl << endl;
 	return Results.ProcessCount * 100000 + SecCount;
@@ -6262,8 +6282,8 @@ OperateProcess OperateProcess1(char* DllPath)//远程线程注入
 
 OperateProcess OperateProcess2()//暂停进程运行
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecCount = 0;
 	HANDLE ProcessHandle = 0;
 	_NtSuspendProcess NtSuspendProcess = 0;
@@ -6287,7 +6307,7 @@ OperateProcess OperateProcess2()//暂停进程运行
 			if (NtSuspendProcess)
 			{
 				NtSuspendProcess(ProcessHandle);
-				SecCount++;
+				++SecCount;
 			}
 			else
 				state = 19;
@@ -6303,8 +6323,8 @@ OperateProcess OperateProcess2()//暂停进程运行
 
 OperateProcess OperateProcess3()//恢复进程运行
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecCount = 0;
 	HANDLE ProcessHandle = 0;
 	_NtResumeProcess NtResumeProcess = 0;
@@ -6328,7 +6348,7 @@ OperateProcess OperateProcess3()//恢复进程运行
 			if (NtResumeProcess)
 			{
 				NtResumeProcess(ProcessHandle);
-				SecCount++;
+				++SecCount;
 			}
 			else
 				state = 19;
@@ -6355,7 +6375,7 @@ OperateProcess OperateProcess4()//结束进程
 		HANDLE hdle = OpenProcess(PROCESS_ALL_ACCESS, TRUE, Results.PNode[i].ProcessIDNode);
 		if (hdle && TerminateProcess(hdle, NULL) == 1)
 		{
-			SecCount++;
+			++SecCount;
 			state = 0;
 		}
 		cout << i + 1 << "\t\t" << Results.PNode[i].ProcessIDNode << "\t\t" << states[state] << endl;
@@ -6366,8 +6386,8 @@ OperateProcess OperateProcess4()//结束进程
 
 OperateProcess OperateProcess5()//暂停进程的所有线程
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecCount = 0, SecThread = 0;
 	cout << "开始对所选的 " << Results.ProcessCount << " 个进程的所有线程执行暂停，详细信息如下：" << endl << endl;
 	cout << "序号\t\tPID\t\t状态" << endl << "==========\t==========\t========================================" << endl << endl;
@@ -6395,7 +6415,7 @@ OperateProcess OperateProcess5()//暂停进程的所有线程
 				if (NtSuspendProcess)
 				{
 					NtSuspendProcess(ProcessHandle);
-					SecThread++;
+					++SecThread;
 				}
 				else
 				{
@@ -6404,7 +6424,7 @@ OperateProcess OperateProcess5()//暂停进程的所有线程
 				}
 			}
 			if (SecThread == Results.PNode[i].ThreadCNode)
-				SecCount++;
+				++SecCount;
 		}
 		cout << i + 1 << "\t\t" << Results.PNode[i].ProcessIDNode << "\t\t" << states[state] << "（" << SecThread << " / " << Results.PNode[i].ThreadCNode << "）" << endl;
 	}
@@ -6416,8 +6436,8 @@ OperateProcess OperateProcess5()//暂停进程的所有线程
 
 OperateProcess OperateProcess6()//恢复进程的所有线程
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecCount = 0, SecThread = 0;
 	cout << "开始对所选的 " << Results.ProcessCount << " 个进程的所有线程执行恢复，详细信息如下：" << endl << endl;
 	cout << "序号\t\tPID\t\t状态" << endl << "==========\t==========\t========================================" << endl << endl;
@@ -6445,7 +6465,7 @@ OperateProcess OperateProcess6()//恢复进程的所有线程
 				if (NtResumeProcess)
 				{
 					NtResumeProcess(ProcessHandle);
-					SecThread++;
+					++SecThread;
 				}
 				else
 				{
@@ -6454,7 +6474,7 @@ OperateProcess OperateProcess6()//恢复进程的所有线程
 				}
 			}
 			if (SecThread == Results.PNode[i].ThreadCNode)
-				SecCount++;
+				++SecCount;
 		}
 		cout << i + 1 << "\t\t" << Results.PNode[i].ProcessIDNode << "\t\t" << states[state] << "（" << SecThread << " / " << Results.PNode[i].ThreadCNode << "）" << endl;
 	}
@@ -6466,8 +6486,8 @@ OperateProcess OperateProcess6()//恢复进程的所有线程
 
 OperateProcess OperateProcess7()//窗体操作
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	int SecWM = 0, ToWM = 0, AllWM = 0, RealWM = 0;
 	cout << "开始对所选的 " << Results.ProcessCount << " 个进程执行关闭所有窗体，详细信息如下：" << endl << endl << endl;
 	for (int i = 0; i < Results.ProcessCount; ++i)
@@ -6486,7 +6506,7 @@ OperateProcess OperateProcess7()//窗体操作
 #endif
 		for (const HWND& h : vecHWnds)
 		{
-			ToWM++;
+			++ToWM;
 			HWND parent = GetParent(h);
 			if (parent)
 				printf("%p %p\n", h, parent);
@@ -6496,20 +6516,19 @@ OperateProcess OperateProcess7()//窗体操作
 		for (const HWND& h : vecHWnds)
 		{
 			LRESULT errorlevel = 0;
-			HWND parent = GetParent(h);
 			errorlevel += ::SendMessage(h, WM_CLOSE, NULL, NULL);
 			errorlevel += ::SendMessage(h, WM_DESTROY, NULL, NULL);
 			errorlevel += ::SendMessage(h, WM_QUIT, NULL, NULL);
 			if (EQ(errorlevel, 0))
-				SecWM++;
+				++SecWM;
 		}
 		cout << "已成功关闭该进程的 " << SecWM << " / " << ToWM << " 个窗体。" << endl << endl;
-		if (ToWM == 0)
+		if (0 == ToWM)
 			continue;
 		else
-			RealWM++;
+			++RealWM;
 		if (SecWM == ToWM)
-			AllWM++;
+			++AllWM;
 	}
 	cout << endl << endl << "已成功关闭 " << AllWM << " / " << RealWM << " / " << Results.ProcessCount << " 个进程的所有窗体。" << endl << endl << endl << endl;
 	return Results.ProcessCount * 100000 + AllWM;
@@ -6528,9 +6547,9 @@ OperateProcess OperateProcess8()//探测进程自我保护力阶
 	{
 		cout << "序号\t\t攻击力阶\tPID\t\t映像名称" << endl << "==========\t==========\t==========\t========================================" << endl << endl;
 		state = 0;
-		for (short int i = 0; i < 9; ++i)
-			if (HackChoices[i])
-				if (!Enqueue(queue, AllMethods[i]))
+		for (short int j = 0; j < 9; ++j)
+			if (HackChoices[j])
+				if (!Enqueue(queue, AllMethods[j]))
 				{
 					state = 30;
 					break;
@@ -6605,8 +6624,8 @@ OperateProcess OperateProcess8()//探测进程自我保护力阶
 
 OperateProcess OperateProcess9(char choice, char* DllPath)//启用进程树
 {
-	if (Results.ProcessCount == 0)
-		return NULL;
+	if (0 == Results.ProcessCount)
+		return EXIT_WITH_NONE_SELECTED;
 	BubbleSort('2');
 	int SecTree = 0;
 	for (int i = 0; i < Results.ProcessCount; ++i)
@@ -6676,7 +6695,7 @@ Function Function1()//遍历所有进程
 	}
 	bool ReverseMe = false;
 	char choice = '0';
-	system("cls");
+	ClearConsoleScreen
 	cout << "以下为您提供几种排序方式：" << endl;
 	cout << ">> 1 = 按 PID 排序" << endl;
 	cout << ">> 2 = 按 PPID 排序" << endl;
@@ -6711,7 +6730,7 @@ Function Function1()//遍历所有进程
 	{
 		while (RunThread == 1)
 		{
-			system("cls");
+			ClearConsoleScreen
 			GetProcess();
 			BubbleSort(choice);
 			if (ReverseMe)
@@ -6721,14 +6740,14 @@ Function Function1()//遍历所有进程
 		}
 		if (RunThread == 2)
 		{
-			system("cls");
+			ClearConsoleScreen
 			GetProcess();
 			BubbleSort(choice);
 			if (ReverseMe)
 				ReverseSort(Lists);
 			ShowProcess();
 			cout << endl << endl << "—————————— 请在此界面按任意键执行刷新 ——————————" << endl;
-			system("pause>nul");
+			CallConsolePause
 		}
 	}
 	t.join();
@@ -6780,10 +6799,10 @@ Function Function2()//操作选定进程
 	if (UsingTree && choice != '1')
 	{
 		if (EQ(choice, '8'))
-			system("cls");
+			ClearConsoleScreen
 		OperateProcess9(choice, NULL);
 		cout << endl << "操作完成，请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 		return;
 	}
 	switch (choice)
@@ -6807,7 +6826,7 @@ Function Function2()//操作选定进程
 			else
 				cout << "很抱歉，" << states[14] << endl << endl;
 		}
-		system("cls");
+		ClearConsoleScreen
 		if (UsingTree)
 			OperateProcess9(choice, DllPath);
 		else
@@ -6832,7 +6851,7 @@ Function Function2()//操作选定进程
 		OperateProcess7();
 		break;
 	case '8':
-		system("cls");
+		ClearConsoleScreen
 		OperateProcess8();
 		break;
 	default:
@@ -6843,7 +6862,7 @@ Function Function2()//操作选定进程
 	if (choice != '7' && choice != '8')
 		cout << endl;
 	cout << endl << "操作完成，请按任意键返回。" << endl;
-	system("pause>nul");
+	CallConsolePause
 	return;
 }
 
@@ -6854,7 +6873,7 @@ Function Function3()//操作所有进程
 		MessageBox(NULL, TEXT("很抱歉，内存资源不足，此功能无法正常使用。"), WmipTextTitle, MB_OK | MB_ICONERROR | MB_TOPMOST);
 		return;
 	}
-	system("cls");
+	ClearConsoleScreen
 	GetProcess();
 	char choice = '0';
 	char DllPath[Large] = { 0 };
@@ -6921,7 +6940,7 @@ Function Function3()//操作所有进程
 			else
 				cout << "很抱歉，" << states[14] << endl << endl;
 		}
-		system("cls");
+		ClearConsoleScreen
 		OperateProcess1(DllPath);
 		break;
 	case '2':
@@ -6953,7 +6972,7 @@ Function Function3()//操作所有进程
 	if (choice != '7')
 		cout << endl;
 	cout << endl << "操作完成，请按任意键返回。" << endl;
-	system("pause>nul");
+	CallConsolePause
 	return;
 }
 
@@ -6990,7 +7009,7 @@ Function Function5(bool option)//全屏启动终端
 		system("cmd.exe /k cd /d \"%COMSPEC:~0,-8%\"");
 		exit(EXIT_SUCCESS);
 	}
-	system("cls");
+	ClearConsoleScreen
 	char choice = '0';
 	cout << "/******** 终端全屏启动器 ********/" << endl;
 	cout << "\t1 = 在当前窗口启动" << endl;
@@ -7010,7 +7029,7 @@ Function Function5(bool option)//全屏启动终端
 	case '1':
 		FunctionA();
 		system("cls&cmd.exe /k cd /d \"%COMSPEC:~0,-8%\"");
-		system("cls");
+		ClearConsoleScreen
 		break;
 	case '2':
 		CmdConsole();
@@ -7026,7 +7045,7 @@ Function Function5(bool option)//全屏启动终端
 
 Function Function6()//电源相关操作
 {
-	system("cls");
+	ClearConsoleScreen
 	char choice = '0';
 	cout << "您希望本程序为您做些什么？" << endl;
 	cout << ">> 1 = 强制重启" << endl;
@@ -7063,24 +7082,24 @@ Function Function6()//电源相关操作
 		if (NtShutdownOrReboot(choice + '0'))
 		{
 			cout << states[state] << "若您有幸还能在控制台界面看到这句话，请按任意键返回。" << endl << "一般来说，只有驱动级或更高级（如果有）的程序，才能拦截 NtShutdown 的调用。" << endl;
-			system("pause>nul");
+			CallConsolePause
 		}
 		else if (state != 15)
 		{
 			cout << "\a错误：" << states[state] << "请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 		}
 		break;
 	case '3':
 		if (CallErrorScreen())
 		{
 			cout << states[state] << "若您有幸还能在控制台界面看到这句话，请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 		}
 		else if (state != 15)
 		{
 			cout << "\a错误：" << states[state] << "请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 		}
 		break;
 	case '4':
@@ -7111,7 +7130,7 @@ Function Function6()//电源相关操作
 		}
 		if (DriverConnector(tmp, false) == EXIT_SUCCESS)
 			cout << states[state] << "若您有幸还能在控制台界面看到这句话，请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 		break;
 #if (defined _WIN64 || defined WIN64)
 	case '5':
@@ -7125,10 +7144,10 @@ Function Function6()//电源相关操作
 
 Function Function7()//设置强度递增结束方式
 {
-	system("cls");
+	ClearConsoleScreen
 	TellForce();
 	cout << "以上说明仅适用于本程序，检测结果仅供参考，请按任意键继续。" << endl;
-	system("pause>nul");
+	CallConsolePause
 	state = 0;
 	DestroyQueue(queue);
 	if (!InitQueue(queue))
@@ -7142,7 +7161,7 @@ Function Function7()//设置强度递增结束方式
 			choices[i] = 'Y';
 	do
 	{
-		system("cls");
+		ClearConsoleScreen
 		cout << "序号\t\t攻击力阶\t操作名称" << endl << "==========\t==========\t========================================" << endl << endl;
 		for (short int i = 0; i < 9; ++i)
 			cout << i + 1 << "\t\t" << AllMethods[i].Strength << "\t\t" << AllMethods[i].MethodName << endl;
@@ -7158,7 +7177,7 @@ Function Function7()//设置强度递增结束方式
 		cout << '!';
 		rewind(stdin);
 		fflush(stdin);
-		choices[10] = _getch();
+		choices[10] = (char)_getch();
 		rewind(stdin);
 		fflush(stdin);
 		switch (choices[10])
@@ -7169,7 +7188,7 @@ Function Function7()//设置强度递增结束方式
 				HackChoices[i] = true;
 			queue.tag = 9;
 			cout << endl << endl << endl << "YYYYYYYYY" << endl << "设置完毕，请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 			return;
 		case 'Y':
 		case 'y':
@@ -7241,7 +7260,7 @@ Function Function7()//设置强度递增结束方式
 		queue.tag = 0;
 		DestroyQueue(queue);
 		cout << "回滚完成，请检查您的内存空间，并按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 		return;
 	}
 	if (queue.length == 0)
@@ -7255,16 +7274,16 @@ Function Function7()//设置强度递增结束方式
 		PrintQueue(queue);
 		DestroyQueue(queue);
 		cout << endl << endl << endl << "设置完毕，请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 	}
 	return;
 }
 
-Function Function8(_TCHAR* _0)//设置延迟执行
+Function Function8(_TCHAR* arggg)//设置延迟执行
 {
 	bool UseAdmin = false, UseSilent = false;
 	char choice = '0';
-	system("cls");
+	ClearConsoleScreen
 	cout << "本功能主要用于仅支持命令行，以下是在交互模式下可提供的操作：" << endl;
 	cout << ">> 1 = 延时强制关机" << endl;
 	cout << ">> 2 = 延时强制重启" << endl;
@@ -7345,7 +7364,7 @@ Function Function8(_TCHAR* _0)//设置延迟执行
 	rewind(stdin);
 	fflush(stdin);
 	char tmp[Small] = { 0 }, _tmp[Small + 2] = { 0 }, option[30] = { 0 }, _option[6] = { 0 };
-	TcharToChar(_0, tmp);
+	TcharToChar(arggg, tmp);
 	strcat_s(_tmp, "\"");
 	strcat_s(_tmp, tmp);
 	strcat_s(_tmp, "\"");
@@ -7457,7 +7476,10 @@ Function FunctionA()//全屏显示
 	DeleteMenu(GetSystemMenu(GetConsoleWindow(), FALSE), SC_CLOSE, MF_BYCOMMAND);//禁止窗口被关
 	SetWindowLong(hwnd, GWL_STYLE, (l_WinStyle | WS_POPUP | WS_MAXIMIZE) & ~WS_CAPTION & ~WS_THICKFRAME & ~WS_BORDER & ~WS_MAXIMIZEBOX & ~WS_MINIMIZEBOX & ~WS_SIZEBOX & ~WS_SYSMENU);//禁用菜单
 	SetWindowPos(hwnd, HWND_TOP, 0, 0, cx, cy, 0);
-	if (isAdmin() && FindFirstFileExists(L"DriverLoader.exe", FALSE))
+	if (isAdmin()
+		&& FindFirstFileExists(L_DriverLoader, FALSE)
+		&& FindFirstFileExists(L_ZwTerminateProcess, FALSE)
+	)
 		system("DriverLoader.exe /start ZwTerminateProcess.sys");
 	return;
 }
@@ -7467,8 +7489,7 @@ Function FunctionB()//打开程序所在目录
 	char _char[Large] = { 0 }, path[Large] = "explorer.exe \"";
 	TcharToChar(_0, _char);
 	size_t i = strlen(_char) - 1;
-	while ((_char[i]) != '\\')
-		i--;
+	while ((_char[i--]) != '\\');
 	for (size_t j = 0; j < i; ++j)
 		path[j + strlen("explorer.exe \"")] = _char[j];
 	system(path);
@@ -7478,7 +7499,7 @@ Function FunctionB()//打开程序所在目录
 
 Function FunctionC()//获取本地进程 token 权限
 {
-	system("cls");
+	ClearConsoleScreen
 	if (EnableDebugPriv("SeDebugPrivilege"))
 	{
 		cout << "获取本地进程 token 权限成功，" << states[28] << endl;
@@ -7534,7 +7555,7 @@ Function FunctionC()//获取本地进程 token 权限
 
 Function FunctionD()//修改倒计时
 {
-	system("cls");
+	ClearConsoleScreen
 	cout << "说明：倒计时将作用于短暂性停留以及自动刷新进程列表间隔等功能，默认值为 5000 毫秒。" << endl;
 	cout << "当前倒计时：" << Rtime << "，如不需要更改请输入该值。" << endl;
 	cout << "单位换算：1 分钟 = 60 秒\t1 秒 = 1000 毫秒" << endl;
@@ -7559,7 +7580,7 @@ Function FunctionD()//修改倒计时
 	else
 	{
 		cout << "修改成功，请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 	}
 	return;
 }
@@ -7571,14 +7592,14 @@ Function FunctionE()//以管理员权限启动
 	{
 		state = 27;
 		cout << states[state] << "请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 		return;
 	}
 	if (GetAdminPermission(_0, NULL))
 	{
 		cout << "已发起运行，程序将自动退出。" << endl;
 		Sleep(Rtime);
-		system("cls");
+		ClearConsoleScreen
 		exit(EXIT_SUCCESS);
 	}
 	else
@@ -7587,7 +7608,7 @@ Function FunctionE()//以管理员权限启动
 			cout << states[state] << "请按任意键返回。" << endl;
 		else
 			cout << "\a错误：" << states[state] << "请按任意键返回。" << endl;
-		system("pause>nul");
+		CallConsolePause
 	}
 	return;
 }
@@ -7601,7 +7622,7 @@ Function FunctionF()//颜色选择面板
 	{
 		for (size_t i = strlen("color "); i < 10; ++i)
 			commandline[i] = 0;
-		system("cls");
+		ClearConsoleScreen
 		cout << "可供选择的颜色有：" << endl;
 		cout << "\t0 = 黑色\t8 = 灰色" << endl;
 		cout << "\t1 = 蓝色\t9 = 淡蓝色" << endl;
@@ -7656,7 +7677,7 @@ Function FunctionF()//颜色选择面板
 		{
 		case 6:
 			strcpy_s(color_code, colorcode);
-			system("cls");
+			ClearConsoleScreen
 			flag = false;
 			break;
 		case 7:
@@ -7664,7 +7685,7 @@ Function FunctionF()//颜色选择面板
 				commandline[i] = 0;
 			strcat_s(commandline, color_code);
 			system(commandline);
-			system("cls");
+			ClearConsoleScreen
 			break;
 		case 2:
 			for (size_t i = strlen("color "); i < 10; ++i)
@@ -7858,8 +7879,8 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 		cout << endl << "描述：结束进程。" << endl << endl;
 		cout << "二级参数：" << endl << "\t/x\t\t驱动结束" << endl << "\t/t\t\t结束进程树" << endl << "\t/n\t\t常规结束" << endl << "\t/w\t\t作关闭窗口处理而非结束进程" << endl;
 		cout << "三级参数：" << endl << "\t/all\t\t指定所有进程（此参数必须放在二级参数后且不能与其它三级参数连用）" << endl << "\t/im\t\t指定映像名称" << endl << "\t[imagename]\t映像名称" << endl << "\t/pid\t\t指定 PID" << endl << "\t[PID]\t\t进程标识符" << endl << endl;
-		cout << "用法：" << endl << "\twmip Terminate [/t|/n|/w] /im [imagename] /pid [PID] ..." << endl << "\twmip Terminate [/t|/n|/w] /all" << endl << endl;
-		cout << "示例：" << endl << "\twmip Terminate /n /im \"PC Hunter*\" /pid 648" << endl << "\twmip Terminate /t /im cmd.exe" << endl << "\twmip Terminate /n /all" << endl << "\twmip Terminate /w /im notepad.exe /pid 768" << endl << endl;
+		cout << "用法：" << endl << "\twmip Terminate [/x|/t|/n|/w] /im [imagename] /pid [PID] ..." << endl << "\twmip Terminate [/x|/t|/n|/w|] /all" << endl << endl;
+		cout << "示例：" << endl << "\twmip Terminate /x /im \"PC Hunter*\" /pid 648" << endl << "\twmip Terminate /t /im cmd.exe" << endl << "\twmip Terminate /n /all" << endl << "\twmip Terminate /w /im notepad.exe /pid 768" << endl << endl;
 	}
 	else if (_wcsicmp(_tchar, L"Topmost") == 0)
 		cout << "置顶当前窗口。" << endl;
@@ -7914,10 +7935,13 @@ Function FunctionI(bool EnSure)//添加程序到环境变量中
 		mywmip[i] = 0;
 	strcat_s(CommandLine, mywmip);
 	strcat_s(CommandLine, "wmip.exe\" /C /H /K /V /Y");
-	if (_0[lstrlen(_0) - 9] == '\\' && (_0[lstrlen(_0) - 8] == 'W' || _0[lstrlen(_0) - 8] == 'w') && (_0[lstrlen(_0) - 7] == 'M' || _0[lstrlen(_0) - 7] == 'm')
-		&& (_0[lstrlen(_0) - 6] == 'I' || _0[lstrlen(_0) - 6] == 'i') && (_0[lstrlen(_0) - 5] == 'P' || _0[lstrlen(_0) - 5] == 'p')
-		)
-		cout << "文件名已是 wmip.exe，程序继续运行。";
+	if (_0[lstrlen(_0) - 9] == '\\'
+		&& (_0[lstrlen(_0) - 8] == 'W' || _0[lstrlen(_0) - 8] == 'w')
+		&& (_0[lstrlen(_0) - 7] == 'M' || _0[lstrlen(_0) - 7] == 'm')
+		&& (_0[lstrlen(_0) - 6] == 'I' || _0[lstrlen(_0) - 6] == 'i')
+		&& (_0[lstrlen(_0) - 5] == 'P' || _0[lstrlen(_0) - 5] == 'p')
+	)
+		cout << "文件名已是 wmip.exe，程序继续运行。" << endl;
 	else
 		system(CommandLine);
 	if (!isAdmin())
@@ -8010,7 +8034,7 @@ Function FunctionI(bool EnSure)//添加程序到环境变量中
 	RegCloseKey(_hKey);
 	if (state >= 36 && state <= 38)
 		cout << "错误：";
-	cout << states[state];
+	cout << states[state] << endl;
 	return;
 }
 
@@ -8034,12 +8058,12 @@ int CountTreeNode(TreeNode isVirus, int EdCount)//节点计数
 	int isV_count = EdCount;
 	if (isVirus.FirstChild)
 	{
-		isV_count++;
+		++isV_count;
 		CountTreeNode(*isVirus.FirstChild, isV_count);
 	}
 	if (isVirus.NextSibling)
 	{
-		isV_count++;
+		++isV_count;
 		CountTreeNode(*isVirus.NextSibling, isV_count);
 	}
 	return isV_count;
@@ -8124,7 +8148,7 @@ Goose Goose2()//进程时监控
 						fclose(fpp);
 					}
 				}
-				if (isExit && pe32.th32ProcessID == pCur->data.ProcessID)
+				if (isExit && pe32.th32ProcessID == (DWORD)pCur->data.ProcessID)
 					isExit = false;
 				hProcess = Process32Next(hProceessnap, &pe32);
 			}
@@ -8164,7 +8188,7 @@ Goose Goose2()//进程时监控
 		while (k && k->next && k != j)
 		{
 			k = k->next;
-			tmpDisc++;
+			++tmpDisc;
 		}
 		if (tmpDisc >= 10)
 		{
@@ -8178,7 +8202,7 @@ Goose Goose2()//进程时监控
 					if (tmpPPID[pp] == k->data.PPID)
 					{
 						flag = false;
-						countPPID[pp]++;
+						++countPPID[pp];
 					}
 				if (flag)
 				{
@@ -8224,7 +8248,7 @@ Goose Goose2()//进程时监控
 						BOOL hProcess = Process32First(hProceessnap, &pe32);
 						while (hProcess)
 						{
-							if (tmpPPID[pp] && pe32.th32ParentProcessID == tmpPPID[pp])
+							if (tmpPPID[pp] && pe32.th32ParentProcessID == (DWORD)tmpPPID[pp])
 							{
 								HANDLE chdle = OpenProcess(PROCESS_ALL_ACCESS, TRUE, pe32.th32ParentProcessID);
 								if (chdle)
@@ -8293,7 +8317,6 @@ int MainActivity(_TCHAR* argg)
 		DriverNoProcess();
 	FunctionA();
 	thread protecting(ThreadControl3);
-	int temp = GetLastError();
 	protecting.detach();
 	if (EnableDebugPriv("SeDebugPrivilege"))
 		TkControl = 1;
@@ -8402,26 +8425,26 @@ int MainActivity(_TCHAR* argg)
 			break;
 		case 'G':
 		case 'g':
-			system("cls");
+			ClearConsoleScreen
 			cout << "优化仅对本程序本次运行期间有效，开始执行优化，请稍候。" << endl;
 			FunctionG();
 			cout << "优化完成，请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 			break;
 		case 'H':
 		case 'h':
-			system("cls");
+			ClearConsoleScreen
 			lstrcpy(THtmp, L"Help");
 			ArgHelp(THtmp);
 			cout << endl << endl << "显示关于完成，请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 			break;
 		case 'I':
 		case 'i':
-			system("cls");
+			ClearConsoleScreen
 			FunctionI(false);
 			cout << "请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 			break;
 		case '?':
 			system("cls&set /p=%COMSPEC:~0,-8%<nul");
@@ -8431,13 +8454,13 @@ int MainActivity(_TCHAR* argg)
 			lstrcpy(THtmp, L"/?");
 			ArgHelp(THtmp);
 			cout << endl << endl << "显示帮助完成，请按任意键返回。" << endl;
-			system("pause>nul");
+			CallConsolePause
 			break;
 		default:
 			continue;
 		}
 	} while (choice != 0);
-	system("cls");
+	ClearConsoleScreen
 	protecting.~thread();
 	return EXIT_SUCCESS;
 }
@@ -8449,7 +8472,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		return MainActivity(argv[0]);
 	else if (argc > 1)
 	{
-		int i, result = 0;
+		int i  = 0, result = 0;
 		for (i = 1; i < argc; ++i)
 		{
 			if (_wcsicmp(argv[i], L"/?") == 0 || _wcsicmp(argv[i], L"-?") == 0)
@@ -8802,7 +8825,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				cout << "\a错误：" << states[state] << endl;
 				return EXIT_FAILURE;
 			}
-			for (int i = 0; i < Results.ProcessCount; ++i)
+			for (i = 0; i < Results.ProcessCount; ++i)
 			{
 				if (fp)
 					fp << Results.PNode[i].ProcessIDNode << "\t\t" << Results.PNode[i].ParentIDNode << "\t\t" << Results.PNode[i].ThreadCNode << "\t\t";
@@ -8862,7 +8885,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 					if (argv[2][i] == 'Y' || argv[2][i] == 'y' || argv[2][i] == '1')
 					{
 						HackChoices[i] = true;
-						queue.tag++;
+						++queue.tag;
 					}
 				if (queue.tag == 0)
 				{
@@ -8893,7 +8916,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 					if (argv[2][i] == 'Y' || argv[2][i] == 'y' || argv[2][i] == '1')
 					{
 						HackChoices[i] = true;
-						queue.tag++;
+						++queue.tag;
 					}
 				if (queue.tag == 0)
 				{
@@ -8970,7 +8993,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 	{
 		cout << "\a严重错误：程序被间谍，命令行被非法更改！" << endl;
 		cout << "请按任意键退出，或直接关闭本窗口。" << endl;
-		system("pause>nul");
+		CallConsolePause
 		return EXIT_UNSAFELY;
 	}
 	return EXIT_OUT_OF_SCHEDULE;

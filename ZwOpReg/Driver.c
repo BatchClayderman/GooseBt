@@ -11,11 +11,10 @@
 /**/
 /*
  * uPath：注册表路径
- * uSubKey：上述路径下的子项或子键
- * uType：类型
+ * uSubKeyType：设定为子项、子键或默认键
+ * uSubKey：上述路径下的子项、子键或默认键
+ * uValueType：值类型
  * uValue：值
- * uSize：值类型大小
- * isSubFolder：指定是否为子项
  */
 
 
@@ -69,12 +68,12 @@ NTSTATUS ntIBinaryCreateKey(UNICODE_STRING uPath, UNICODE_STRING uSubKey)
 	attrSubKey.SecurityQualityOfService = NULL;
 	attrSubKey.RootDirectory = hPath;//注意这里父目录设置 uPath 的句柄
 	ntStatus = ZwCreateKey(&hSubKey, //传出创建的 Key
-		KEY_CREATE_SUB_KEY,        //权限（最小权限原则）
-		&attrSubKey,               //路径
+		KEY_CREATE_SUB_KEY,          //权限（最小权限原则）
+		&attrSubKey,                 //路径
 		0,
 		NULL,
-		REG_OPTION_NON_VOLATILE,   //创建的 Key 重启是否存在还是临时的
-		&isRegStatus               //保存 Key 的状态——创建成功还是打开
+		REG_OPTION_NON_VOLATILE,     //创建的 Key 重启是否存在还是临时的
+		&isRegStatus                 //保存 Key 的状态——创建成功还是打开
 	);
 	ZwClose(hSubKey);
 	ZwClose(hPath);
@@ -311,8 +310,5 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 		DbgPrint("%s->Initial->Listener->Failed! ", _ZwOpReg_H);
 		return bRet;
 	}
-	UNICODE_STRING uPath, uSubKey;
-	RtlInitUnicodeString(&uPath, GooseBtKeyPath);
-	RtlInitUnicodeString(&uSubKey, ZwOpRegSubKey);
 	return ntIBinaryInit();
 }
