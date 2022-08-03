@@ -70,6 +70,9 @@ typedef struct
 	char uValue[MAX_PATH];// flag = 5
 } ZwOpRegStruct;
 
+
+/** 字符串处理子函数 **/
+/* 是否合法信息 */
 BOOLEAN isValidStructer(char buffer[], int newline_index[INFO_MEMBER_CNT], ULONG inlen)
 {
 	if (inlen >= MAX_PATH << 2)
@@ -85,12 +88,35 @@ BOOLEAN isValidStructer(char buffer[], int newline_index[INFO_MEMBER_CNT], ULONG
 		}
 	if (INFO_SEP_CNT != cnt)//分隔符数量太少
 		return FALSE;
-	if (newline_index[0] != 1 || newline_index[2] - newline_index[1] != 1 || newline_index[4] - newline_index[3] != 0)//单独的一个字符
+	if (newline_index[0] != 1 || newline_index[2] - newline_index[1] != 2 || newline_index[4] - newline_index[3] != 2)//单独的一个字符
 		return FALSE;
 	for (int i = 1; i < INFO_MEMBER_CNT - 1; ++i)//各个数据长度（从 1 开始检查即可）
 		if (newline_index[i + 1] - newline_index[i] > MAX_PATH)
 			return FALSE;
 	return TRUE;
+}
+
+/* R3 转 R0 注册表路径 */
+BOOLEAN transReg(char uPath[MAX_PATH])
+{
+	if (strlen(uPath) >= 4)
+	{
+		if (('H' == uPath[0] || 'h' == uPath[0])
+			&& ('K' == uPath[1] || 'k' == uPath[1])
+			&& ('L' == uPath[2] || 'l' == uPath[2])
+			&& ('M' == uPath[3] || 'm' == uPath[3])
+		)
+		{
+			char uTmp[MAX_PATH] = { 0 };
+			strcpy(uTmp, "\\registry\\machine");
+			if (strlen(uPath) - 4 + strlen(uTmp) >= MAX_PATH)//不够长
+				return FALSE;
+			strcat_s(uTmp, MAX_PATH, &uPath[4]);
+			strcpy(uPath, uTmp);
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 
@@ -113,6 +139,10 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 			PVOID buffer = irp->AssociatedIrp.SystemBuffer;//缓冲区地址
 			ULONG inlen = irpsp->Parameters.DeviceIoControl.InputBufferLength;//输入缓冲区长度
 			ULONG outlen = irpsp->Parameters.DeviceIoControl.OutputBufferLength;//输出缓冲区长度
+			ANSI_STRING NTPath, NTSubKey;
+			UNICODE_STRING uPath, uSubKey;
+			RtlInitUnicodeString(&uPath, L"");
+			RtlInitUnicodeString(&uSubKey, L"");
 
 			/* 根据前面定义好的设备请求功能号，详细判断输入还是输出，我们在这里只判断输入 */
 			switch (irpsp->Parameters.DeviceIoControl.IoControlCode)
@@ -124,15 +154,10 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 					DbgPrint("%s->ASSERT(buffer != NULL && inlen < MAX_PATH << 2 && inlen > 0 && 0 == outlen)", _ZwOpReg_H);
 					break;
 				}
-				short int choice = 0;//请求方案
 				char bufIN[MAX_PATH << 2] = { 0 };
 				int cur_index = 0, newline_index[INFO_MEMBER_CNT] = { 0 };
 				strcpy_s(bufIN, inlen, (char*)buffer);
-				for (ULONG i = 0; i < inlen; ++i)
-					if (bufIN[i] == '\n')
-						DbgPrint("%s->\'\\n\'\n", _ZwOpReg_H);
-					else
-						DbgPrint("%s->%c\n", _ZwOpReg_H, bufIN[i]);
+				bufIN[0] = ((char*)buffer)[0];
 				if (!isValidStructer(bufIN, newline_index, inlen))//检查是否合法并获得分割位置
 				{
 					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwOpReg_H, bufIN);//无效指令充当接收信息
@@ -152,28 +177,43 @@ NTSTATUS cwkDispatch(IN PDEVICE_OBJECT dev, IN PIRP irp)//分发函数
 				regInfo.uValueType = bufIN[newline_index[3] + 1];
 				cur_index = 0;
 				for (int i = newline_index[4] + 1; i < newline_index[5]; ++i)
-					regInfo.uSubKey[cur_index++] = bufIN[i];
+					regInfo.uValue[cur_index++] = bufIN[i];
 
-				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uOpType);
-				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uPath);
-				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uSubKeyType);
-				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uSubKey);
-				DbgPrint("%s->GetWmirMsg()->%c\n", _ZwOpReg_H, regInfo.uValueType);
-				DbgPrint("%s->GetWmirMsg()->%s\n", _ZwOpReg_H, regInfo.uValue);
-
-				switch (choice)
+				/* R3 转 R0 的字符串处理 */
+				if (!transReg(regInfo.uPath))
 				{
-				case 1://执行 add
-					DbgPrint("%s->GetWmirMsg()->add\n", _ZwOpReg_H);
+					DbgPrint("%s->InvalidPath->\"%s\"\n", _ZwOpReg_H, regInfo.uPath);
 					break;
-				case 2://执行 del
-					DbgPrint("%s->GetWmirMsg()->del\n", _ZwOpReg_H);
+				}
+
+				/* 打印相关字段信息 */
+				DbgPrint("%s->GetWmirMsg()->uOpType = \'%c\'\n", _ZwOpReg_H, regInfo.uOpType);
+				DbgPrint("%s->GetWmirMsg()->uPath = \"%s\"\n", _ZwOpReg_H, regInfo.uPath);
+				DbgPrint("%s->GetWmirMsg()->uSubKeyType = \'%c\'\n", _ZwOpReg_H, regInfo.uSubKeyType);
+				DbgPrint("%s->GetWmirMsg()->uSubKey = \"%s\"\n", _ZwOpReg_H, regInfo.uSubKey);
+				DbgPrint("%s->GetWmirMsg()->uValueType = \'%c\'\n", _ZwOpReg_H, regInfo.uValueType);
+				DbgPrint("%s->GetWmirMsg()->uValue = \"%s\"\n", _ZwOpReg_H, regInfo.uValue);
+
+				/* 执行相关操作 */
+				RtlInitAnsiString(&NTPath, regInfo.uPath);
+				RtlInitAnsiString(&NTSubKey, regInfo.uSubKey);
+				RtlAnsiStringToUnicodeString(&uPath, &NTPath, TRUE);
+				RtlAnsiStringToUnicodeString(&uSubKey, &NTSubKey, TRUE);
+
+				switch (bufIN[0])
+				{
+				case 'A':
+				case 'a'://执行 add
+					ntIBinaryCreateKey(uPath, uSubKey);
 					break;
-				case 3://执行 set
-					DbgPrint("%s->GetWmirMsg()->set\n", _ZwOpReg_H);
+				case 'D':
+				case 'd'://执行 del
 					break;
-				case 4://执行 query
-					DbgPrint("%s->GetWmirMsg()->query\n", _ZwOpReg_H);
+				case 'S':
+				case 's'://执行 set
+					break;
+				case 'Q':
+				case 'q'://执行 query
 					break;
 				default:
 					DbgPrint("%s->UnknownMsg->\"%s\"\n", _ZwOpReg_H, bufIN);//无效指令充当接收信息

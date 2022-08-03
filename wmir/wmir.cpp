@@ -127,9 +127,10 @@ public:
 			{
 				if ('0' != this->uSubKeyType)
 					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
-				this->uSubKeyType = 'e';//注意没有下一个参数
+				this->uSubKeyType = 'e';
+				lstrcpy(this->uSubKey, L"");//注意没有下一个参数
 			}
-			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/f") || 0 == _wcsicmp(argv[i], L"-f")))
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/vf") || 0 == _wcsicmp(argv[i], L"-vf")))
 			{
 				if ('0' != this->uSubKeyType)
 					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
@@ -195,8 +196,13 @@ public:
 		for (int i = 0; i < MAX_PATH << 2; ++i)//清空
 			this->allMsg[i] = 0;
 		wsprintf(allMsg, L"%c\n%s\n%c\n%s\n%c\n%s", this->uOpType, this->uPath, this->uSubKeyType, this->uSubKey, this->uValueType, this->uValue);
-#ifdef _DEBUG
-		wcout << this->allMsg << endl << endl;
+#ifndef _DEBUG
+		wcout << L"uOpType = \'" << this->uOpType << "\'" << endl;
+		wcout << L"uPath = \"" << this->uPath << "\"" << endl;
+		wcout << L"uSubKeyType = \'" << this->uSubKeyType << "\'" << endl;
+		wcout << L"uSubKey = \"" << this->uSubKey << "\"" << endl;
+		wcout << L"uValueType = \'" << this->uValueType << "\'" << endl;
+		wcout << L"uValue = \"" << this->uValue << "\"" << endl << endl;
 #endif
 		return;
 	}
@@ -254,7 +260,7 @@ void addHelp()
 	wcout << endl << L"描述：向注册表中增加项或键。" << endl;
 	wcout << endl << L"wmir add [注册表路径] [子项、子键或默认值] ..." << endl << endl;
 	wcout << L"可用参数列表：" << endl;
-	wcout << L"\t[/v [键名称]|/ve|/f [项名称]]\t设定为子项、子键或默认值名称" << endl;
+	wcout << L"\t[/v [键名称]|/ve|/vf [项名称]]\t设定为子项、子键或默认值名称" << endl;
 	wcout << L"\t/t [值类型]\t\t\t值类型" << endl;
 	wcout << L"\t/d [值内容]\t\t\t值内容" << endl << endl;
 	wcout << L"可用的值类型：" << endl;
@@ -310,13 +316,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		WmirType wrt;
 		if (0 == _wcsicmp(argv[1], L"add"))
-			wrt.setOpType(L'1');
+			wrt.setOpType(L'a');
 		else if (0 == _wcsicmp(argv[1], L"del") || 0 == _wcsicmp(argv[1], L"delete"))
-			wrt.setOpType(L'2');
+			wrt.setOpType(L'd');
 		else if (0 == _wcsicmp(argv[1], L"set"))
-			wrt.setOpType(L'3');
+			wrt.setOpType(L's');
 		else if (0 == _wcsicmp(argv[1], L"query"))
-			wrt.setOpType(L'4');
+			wrt.setOpType(L'q');
 		else
 		{
 			wcout << L"\a错误：命令行首参数不正确！" << endl;
