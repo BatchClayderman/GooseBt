@@ -388,7 +388,7 @@ NTSTATUS RegistryCallback(IN PVOID CallbackContext,
 	ExSystemTimeToLocalTime(&CurrentSystemTime, &CurrentLocalTime);
 	//registryEvent.processId = PsGetCurrentProcessId();
 	//registryEvent.eventType = (REG_NOTIFY_CLASS)Argument1;
-	type = (REG_NOTIFY_CLASS)Argument1;
+	type = *(REG_NOTIFY_CLASS*)Argument1;
 	try
 	{
 		/* Large switch statement for all registry events ... fairly easy to understand */
@@ -519,7 +519,7 @@ NTSTATUS RegistryCallback(IN PVOID CallbackContext,
 			}
 			pRegistryEvent->processId = PsGetCurrentProcessId();
 			RtlTimeToTimeFields(&CurrentLocalTime, &pRegistryEvent->time);
-			pRegistryEvent->eventType = (REG_NOTIFY_CLASS)Argument1;
+			pRegistryEvent->eventType = *(REG_NOTIFY_CLASS*)Argument1;
 			if (!QueueRegistryEvent(pRegistryEvent))
 			{
 				ExFreePoolWithTag(pRegistryEvent, REGISTRY_POOL_TAG);

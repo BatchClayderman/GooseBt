@@ -144,19 +144,19 @@ A console application to manage process. Both commandline mode and interactive m
 
 ## wmir.exe
 
-Testing
+Release
 
 A console application to manage registry. Only commandline mode is supported. Only kernel operation is provided. 
 
 ## ZwDeleteFile.sys
 
-Testing
+Release
 
 A kernel driver to delete file forcibly in kernel mode. Currently, it could not remove occuried or protected files still. Forcibly removing directory is not supported. 
 
 ## ZwOpReg.sys
 
-Testing
+Release
 
 A kernel driver to operate the Registry in kernel mode. 
 

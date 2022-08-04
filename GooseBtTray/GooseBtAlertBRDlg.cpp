@@ -29,7 +29,7 @@ BOOL CGooseBtAlertBRDlg::OnInitDialog()
 	GetDlgItem(IDC_STATIC_TITLE)->ShowWindow(SW_SHOWNORMAL);
 	CDialogEx::OnInitDialog();
 	((CButton*)GetDlgItem(IDC_RADIO_1))->SetCheck(TRUE);
-	SetTimer(pauseTime * 1000, pauseTime * 1000, NULL);
+	SetTimer((UINT_PTR)pauseTime * 1000, (UINT)pauseTime * 1000, NULL);
 	this->SetFocus();
 	return FALSE;  // return TRUE unless you set the focus to a control
 }
@@ -65,8 +65,8 @@ void CGooseBtAlertBRDlg::OnBnClickedButtonEnter()
 
 void CGooseBtAlertBRDlg::resetTimer()
 {
-	KillTimer(pauseTime * 1000);
-	SetTimer(pauseTime * 1000, pauseTime * 1000, NULL);
+	KillTimer((UINT_PTR)pauseTime * 1000);
+	SetTimer((UINT_PTR)pauseTime * 1000, (UINT)pauseTime * 1000, NULL);
 }
 
 void CGooseBtAlertBRDlg::OnBnClickedCheck2()
@@ -115,10 +115,10 @@ void CGooseBtAlertBRDlg::OnBnClickedCheck0()
 
 void CGooseBtAlertBRDlg::OnTimer(UINT_PTR nIDEvent)
 {
-	if (nIDEvent == pauseTime * 1000)
+	if (nIDEvent == (UINT_PTR)pauseTime * 1000)
 	{
 		ShowWindow(SW_HIDE);
-		KillTimer(pauseTime * 1000);
+		KillTimer((UINT_PTR)pauseTime * 1000);
 	}
 	CDialogEx::OnTimer(nIDEvent);
 	return;

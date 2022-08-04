@@ -212,24 +212,25 @@ NTSTATUS listenerEntry(PDRIVER_OBJECT pDriver)
 		&g_cdo
 	);
 	if (!NT_SUCCESS(status))
+	{
+		DbgPrint("%s->IoCreateDevice()->Failed(%d)! \n", _ZwTerminateProcess_H, status);
 		return status;
+	}
 
 	/* 生成链接符号并与设备绑定 */
 	IoDeleteSymbolicLink(&cdo_syb);//为防止冲突先预先删除
 	status = IoCreateSymbolicLink(&cdo_syb, &cdo_name);//将链接符号与设备绑定
 	if (!NT_SUCCESS(status))
 	{
+		DbgPrint("%s->IoCreateSymbolicLink()->Failed(%d)! \n", _ZwTerminateProcess_H, status);
 		IoDeleteDevice(g_cdo);//删除设备
-		DbgPrint(_ZwTerminateProcess_H);
-		DbgPrint("->IoCreateDevice()->Failed!\n");
 		return status;
 	}
 
 	/* 将所有的分发函数设置为自定义的 */
 	for (ULONG i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
 		pDriver->MajorFunction[i] = cwkDispatch;
-	DbgPrint(_ZwTerminateProcess_H);
-	DbgPrint("->IoCreateDevice()->Successful!\n");
+	DbgPrint("%s->listenerEntry()->Successful! \n", _ZwTerminateProcess_H);
 
 	/* 清除控制设备的初始化标记 */
 	g_cdo->Flags &= ~DO_DEVICE_INITIALIZING;

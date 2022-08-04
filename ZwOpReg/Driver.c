@@ -184,8 +184,8 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPath)
 		/* STATUS_BUFFER_OVERFLOW 或 STATUS_BUFFER_TOO_SMALL */
 		if (ntStatus != STATUS_BUFFER_OVERFLOW && ntStatus != STATUS_BUFFER_TOO_SMALL)
 		{
-			ZwClose(hKey);
 			DbgPrint("%s->Query->uPath = \"%wZ\"->Failed(%d)\n", _ZwOpReg_H, &uPath, ntStatus);
+			ZwClose(hKey);
 			return ntStatus;
 		}
 		pkfinfo = (PKEY_FULL_INFORMATION)ExAllocatePool2(PagedPool, uSize, 'niBI');
@@ -202,17 +202,18 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPath)
 		ntStatus = ZwQueryKey(hKey, KeyFullInformation, pkfinfo, uSize, &uSize);
 		if (!NT_SUCCESS(ntStatus))
 		{
+			DbgPrint("%s->Query->uPath = \"%wZ\"->Failed(%d)\n", _ZwOpReg_H, &uPath, ntStatus);
 			ExFreePoolWithTag(pkfinfo, 'niBI');
 			ZwClose(hKey);
 			return ntStatus;
 		}
 		for (ULONG iteratorValue = 0; iteratorValue < pkfinfo->SubKeys; ++iteratorValue)
 		{
-			ntStatus = ZwEnumerateKey(hKey,
-				0,
-				KeyBasicInformation,
-				NULL,
-				0,
+			ntStatus = ZwEnumerateKey(hKey, 
+				iteratorValue, 
+				KeyBasicInformation, 
+				NULL, 
+				0, 
 				&uSize
 			);//遍历出 Key 就要进行枚举出 Key 的详细信息，使用 ZwEnumerateKey 即可，也是枚举一个结构
 			if (ntStatus != STATUS_BUFFER_OVERFLOW && ntStatus != STATUS_BUFFER_TOO_SMALL)
@@ -230,11 +231,11 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPath)
 				DbgPrint("%s->Query->uPath = \"%wZ\"->Failed(pBaseinfo = %d)\n", _ZwOpReg_H, &uPath, STATUS_MEMORY_NOT_ALLOCATED);
 				return ntStatus;
 			}
-			ntStatus = ZwEnumerateKey(hKey,//继续申请一次得出需要的
-				0,
-				KeyBasicInformation,
-				pBaseinfo,
-				uSize,
+			ntStatus = ZwEnumerateKey(hKey, //继续申请一次得出需要的
+				iteratorValue,
+				KeyBasicInformation, 
+				pBaseinfo, 
+				uSize, 
 				&uSize
 			);
 			if (!NT_SUCCESS(ntStatus))
@@ -257,7 +258,7 @@ NTSTATUS ntIBinaryQueryKey(UNICODE_STRING uPath)
 			uDbgValue.Length = (USHORT)pBaseinfo->NameLength;
 			uDbgValue.MaximumLength = (USHORT)pBaseinfo->NameLength;
 			uDbgValue.Buffer = pBaseinfo->Name;
-			DbgPrint("%s->Query->uPath = \"%wZ\"->Key = \"%wZ\"->Successful\n", _ZwOpReg_H, &uPath, &uDbgValue);
+			DbgPrint("%s->Query->uPath = \"%wZ\"->Item = \"%wZ\"->Successful\n", _ZwOpReg_H, &uPath, &uDbgValue);
 			ExFreePool(pBaseinfo);//同上释放内存
 		}
 		if (NULL != pkfinfo)//释放资源

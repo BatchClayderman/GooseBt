@@ -1,10 +1,8 @@
 ﻿#include <iostream>
 #ifdef WIN32
 #include <Windows.h>
-#include <Winternl.h>
 #elif (defined _WIN64 || defined WIN64)
 #include <Windows.h>
-#include <Winternl.h>
 #ifndef _WIN32
 #define _WIN32 1
 #endif
@@ -13,15 +11,8 @@
 #endif
 #endif//_Windows_H
 #include <tchar.h>
-#include <shlwapi.h>
-#include <tchar.h>
-#include <atlbase.h>
-#include <vector>
-#include <map>
-#include <string>
-#include <psapi.h>
-#ifndef _wmif_H
-#define _wmif_H
+#ifndef _wmir_H
+#define _wmir_H
 #ifndef EXIT_FAILURE
 #define EXIT_FAILURE 1
 #endif
@@ -31,32 +22,8 @@
 #ifndef EOF
 #define EOF (-1)
 #endif
-#ifndef _countof
-#define _countof(array) (sizeof(array)/sizeof((array)[0]))
-#endif 
-#ifdef UNICODE
-#define GetFilePathFromHandle GetFilePathFromHandleW
-#else
-#define GetFilePathFromHandle GetFilePathFromHandleA
-#endif
-#define STATUS_INFO_LENGTH_MISMATCH          ((NTSTATUS)0xC0000004L)
-#define STATUS_BUFFER_OVERFLOW               ((NTSTATUS)0x80000005L)
-#define FileNameInformation                  ((FILE_INFORMATION_CLASS)9)
-#define SystemHandleInformation              ((SYSTEM_INFORMATION_CLASS)16)
-#endif//_whif_H
-#pragma comment(lib, "psapi.lib")
-#pragma comment(lib, "shlwapi")
-#pragma warning(disable: 6031)
-#pragma warning(disable: 6258)
-#pragma warning(disable: 6387)
+#endif//_whir_H
 using namespace std;
-typedef BOOL APIType;
-typedef BOOL(_stdcall* WOW64_DISABLE_FSDIR)(PVOID*);
-typedef BOOL(_stdcall* WOW64_REVERT_FSDIR) (PVOID);
-typedef BOOL(WINAPI* LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
-typedef std::basic_string<TCHAR, std::char_traits<TCHAR>, std::allocator<TCHAR>> tstring;
-EXTERN_C BOOL GetFilePathFromHandleW(HANDLE hFile, LPWSTR lpszPath, UINT cchMax);
-EXTERN_C BOOL GetFilePathFromHandleA(HANDLE hFile, LPSTR  lpszPath, UINT cchMax);
 
 
 /* 驱动通讯预处理 */
@@ -116,25 +83,37 @@ public:
 		short int flag = 0;
 		for (int i = 3; i < argc; ++i)
 		{
-			if (0 == flag && (0 == _wcsicmp(argv[i], L"/v") || 0 == _wcsicmp(argv[i], L"-v")))
+			if (0 == flag
+				&& (
+					(0 == _wcsicmp(argv[i], L"/v") || 0 == _wcsicmp(argv[i], L"-v"))
+					|| (0 == _wcsicmp(argv[i], L"/vk") || 0 == _wcsicmp(argv[i], L"-vk"))
+				)
+			)
 			{
 				if ('0' != this->uSubKeyType)
-					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
-				this->uSubKeyType = 'v';
+					wcout << L"警告：设定为项或键类型的参数重复！" << endl;
+				this->uSubKeyType = 'k';
 				flag = 3;//下一个命令行参数应当为键名称
 			}
 			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/ve") || 0 == _wcsicmp(argv[i], L"-ve")))
 			{
 				if ('0' != this->uSubKeyType)
-					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
+					wcout << L"警告：设定为项或键类型的参数重复！" << endl;
 				this->uSubKeyType = 'e';
 				lstrcpy(this->uSubKey, L"");//注意没有下一个参数
 			}
 			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/vf") || 0 == _wcsicmp(argv[i], L"-vf")))
 			{
 				if ('0' != this->uSubKeyType)
-					wcout << L"警告：设定为子项、子键或默认键的参数重复！" << endl;
+					wcout << L"警告：设定为项或键类型的参数重复！" << endl;
 				this->uSubKeyType = 'f';
+				lstrcpy(this->uSubKey, L"");//注意没有下一个参数
+			}
+			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/vi") || 0 == _wcsicmp(argv[i], L"-vi")))
+			{
+				if ('0' != this->uSubKeyType)
+					wcout << L"警告：设定为项或键类型的参数重复！" << endl;
+				this->uSubKeyType = 'i';
 				flag = 3;//下一个命令行参数应当为键名称
 			}
 			else if (0 == flag && (0 == _wcsicmp(argv[i], L"/t") || 0 == _wcsicmp(argv[i], L"-t")))
@@ -185,10 +164,10 @@ public:
 		}
 		if (0 != flag)//参数没处理完
 			return false;
-		//if ('0' == this->uSubKeyType)
-		//	this->uSubKeyType = 'e';//默认值
+		if ('0' == this->uSubKeyType)
+			this->uSubKeyType = 'f';//默认值
 		if ('0' == this->uValueType)
-			this->uSubKeyType = 'S';//默认值
+			this->uValueType = 'S';//默认值
 		return true;
 	}
 	void generateDriverMsg()
@@ -196,7 +175,7 @@ public:
 		for (int i = 0; i < MAX_PATH << 2; ++i)//清空
 			this->allMsg[i] = 0;
 		wsprintf(allMsg, L"%c\n%s\n%c\n%s\n%c\n%s", this->uOpType, this->uPath, this->uSubKeyType, this->uSubKey, this->uValueType, this->uValue);
-#ifndef _DEBUG
+#ifdef _DEBUG
 		wcout << L"uOpType = \'" << this->uOpType << "\'" << endl;
 		wcout << L"uPath = \"" << this->uPath << "\"" << endl;
 		wcout << L"uSubKeyType = \'" << this->uSubKeyType << "\'" << endl;
@@ -258,11 +237,16 @@ int DriverConnector(_TCHAR* msg, const _TCHAR* PipeName)
 void addHelp()
 {
 	wcout << endl << L"描述：向注册表中增加项或键。" << endl;
-	wcout << endl << L"wmir add [注册表路径] [子项、子键或默认值] ..." << endl << endl;
+	wcout << endl << L"wmir add [注册表路径] [项或键类型] ..." << endl << endl;
 	wcout << L"可用参数列表：" << endl;
-	wcout << L"\t[/v [键名称]|/ve|/vf [项名称]]\t设定为子项、子键或默认值名称" << endl;
-	wcout << L"\t/t [值类型]\t\t\t值类型" << endl;
-	wcout << L"\t/d [值内容]\t\t\t值内容" << endl << endl;
+	wcout << L"\t/v [键名称]|/ve|/vf|/vi [项名称]\t项或键类型" << endl;
+	wcout << L"\t/t [值类型]\t\t\t\t值类型" << endl;
+	wcout << L"\t/d [值内容]\t\t\t\t值内容" << endl << endl;
+	wcout << L"可用的键类型：" << endl;
+	wcout << L"\t/v [键名称]\t指定注册表路径中的键" << endl;
+	wcout << L"\t/ve\t\t指定注册表路径中的默认键" << endl;
+	wcout << L"\t/vf\t\t指定当前注册表路径（默认）" << endl;
+	wcout << L"\t/vi [项名称]\t指定注册表路径中的子项" << endl << endl;
 	wcout << L"可用的值类型：" << endl;
 	wcout << L"\tS = REG_SZ\t\t字符串值（默认）" << endl;
 	wcout << L"\tB = REG_BINARY\t\t二进制值" << endl;
@@ -271,34 +255,87 @@ void addHelp()
 	wcout << L"\tM = REG_MULTI_SZ\t多字符串值" << endl;
 	wcout << L"\tE = REG_EXPAND_SZ\t可扩充字符串值" << endl;
 	wcout << L"\tN = REG_NONE\t\t无类型值" << endl << endl;
+	wcout << L"示例：" << endl;
+	wcout << L"\twmir add HKLM\\SoftWare\\GooseBt /vf" << endl;
+	wcout << L"\twmir add HKLM\\SoftWare\\GooseBt /ve /d \"GooseBt\"" << endl;
+	wcout << L"\twmir add HKLM\\SoftWare\\GooseBt /vi GooseBt" << endl;
+	wcout << L"\twmir add HKLM\\SoftWare\\GooseBt /v wmir /t D /d 3" << endl << endl;
 	return;
 }
 
 void delHelp()
 {
+	wcout << endl << L"描述：向注册表中删除项或键。" << endl;
+	wcout << endl << L"wmir del [注册表路径] [项或键类型] ..." << endl << endl;
+	wcout << L"可用参数列表：" << endl;
+	wcout << L"\t/v [键名称]|/ve|/vf|/vi [项名称]\t项或键类型" << endl << endl;
+	wcout << L"可用的键类型：" << endl;
+	wcout << L"\t/v [键名称]\t指定注册表路径中的键" << endl;
+	wcout << L"\t/ve\t\t指定注册表路径中的默认键" << endl;
+	wcout << L"\t/vf\t\t指定当前注册表" << endl;
+	wcout << L"\t/vi [项名称]\t指定注册表路径中的子项" << endl << endl;
+	wcout << L"示例：" << endl;
+	wcout << L"\twmir del HKLM\\SoftWare\\GooseBt /v wmir" << endl;
+	wcout << L"\twmir del HKLM\\SoftWare\\GooseBt /vi GooseBt" << endl;
+	wcout << L"\twmir del HKLM\\SoftWare\\GooseBt /ve" << endl;
+	wcout << L"\twmir del HKLM\\SoftWare\\GooseBt /vf" << endl << endl;
+	wcout << L"请注意，删除默认键仅作值类型还原和值清空处理。" << endl << endl;
 	return;
 }
 
 void setHelp()
 {
+	wcout << endl << L"描述：向注册表中设置项或键。" << endl;
+	wcout << endl << L"wmir set [注册表路径] [键类型] ..." << endl << endl;
+	wcout << L"可用参数列表：" << endl;
+	wcout << L"\t/v [键名称]|/ve\t\t键类型" << endl;
+	wcout << L"\t/t [值类型]\t\t值类型" << endl;
+	wcout << L"\t/d [值内容]\t\t值内容" << endl << endl;
+	wcout << L"可用的键类型（必需参数）：" << endl;
+	wcout << L"\t/v [键名称]\t指定注册表路径中的键" << endl;
+	wcout << L"\t/ve\t\t指定注册表路径中的默认键" << endl << endl;
+	wcout << L"可用的值类型：" << endl;
+	wcout << L"\tS = REG_SZ\t\t字符串值（默认）" << endl;
+	wcout << L"\tB = REG_BINARY\t\t二进制值" << endl;
+	wcout << L"\tD = REG_DWORD\t\t32 位 DWORD 值" << endl;
+	wcout << L"\tQ = REG_QWORD\t\t64 位 QWORD 值" << endl;
+	wcout << L"\tM = REG_MULTI_SZ\t多字符串值" << endl;
+	wcout << L"\tE = REG_EXPAND_SZ\t可扩充字符串值" << endl;
+	wcout << L"\tN = REG_NONE\t\t无类型值" << endl << endl;
+	wcout << L"示例：" << endl;
+	wcout << L"\twmir set HKLM\\SoftWare\\GooseBt /ve /d \"GooseBt\"" << endl;
+	wcout << L"\twmir set HKLM\\SoftWare\\GooseBt /v wmir /t D /d 3" << endl << endl;
 	return;
 }
 
 void queryHelp()
 {
+	wcout << endl << L"描述：向注册表中查询一级子项（请使用 DebugView 接收）。" << endl;
+	wcout << endl << L"wmir query [注册表路径] [项类型] ..." << endl << endl;
+	wcout << L"可用参数列表：" << endl;
+	wcout << L"\t/vf|/vi [项名称]\t项类型" << endl << endl;
+	wcout << L"可用的项类型：" << endl;
+	wcout << L"\t/vf\t\t指定当前注册表" << endl;
+	wcout << L"\t/vi [项名称]\t指定注册表路径中的子项" << endl << endl;
+	wcout << L"示例：" << endl;
+	wcout << L"\twmir query HKLM\\SoftWare\\GooseBt /vf" << endl;
+	wcout << L"\twmir query HKLM\\SoftWare\\GooseBt /vi GooseBt" << endl << endl;
 	return;
 }
 
 void showHelp()
 {
 	wcout << endl << L"描述：综合注册表管理器。" << endl;
-	wcout << endl << L"wmir [首参数] [注册表路径] [子项或子键] ..." << endl << endl;
+	wcout << endl << L"wmir [首参数] [注册表路径] [项或键类型] ..." << endl << endl;
 	wcout << L"可用首参数列表：" << endl;
 	wcout << L"\tadd\t\t增" << endl;
 	wcout << L"\tdel\t\t删" << endl;
 	wcout << L"\tset\t\t改" << endl;
 	wcout << L"\tquery\t\t查" << endl << endl;
-	wcout << L"更多信息，请键入“wmir [首参数] /?”" << endl << endl;
+	wcout << L"请注意，本工具仅支持在内核模式下操作注册表。" << endl;
+	wcout << L"要在非内核下操作注册表，请使用系统自带的 reg 命令。" << endl;
+	wcout << L"重复参数以最后一个为准，冗余参数会被自动忽略。" << endl;
+	wcout << L"有关 wmir 的更多信息，请键入“wmir [首参数] /?”并回车。" << endl << endl;
 	return;
 }
 
@@ -347,7 +384,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		if (0 == _wcsicmp(argv[1], L"add"))
 			addHelp();
-		else if (0 == _wcsicmp(argv[1], L"del"))
+		else if (0 == _wcsicmp(argv[1], L"del") || 0 == _wcsicmp(argv[1], L"delete"))
 			delHelp();
 		else if (0 == _wcsicmp(argv[1], L"set"))
 			setHelp();

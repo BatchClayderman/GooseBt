@@ -12,7 +12,6 @@
 #define WIN32 1
 #endif
 #endif//_Windows_H
-#include <tchar.h>
 #include <shlwapi.h>
 #include <tchar.h>
 #include <atlbase.h>
