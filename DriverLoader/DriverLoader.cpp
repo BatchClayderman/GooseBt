@@ -44,7 +44,7 @@
 #endif
 #endif//_DriverLoader_H
 using namespace std;
-#pragma comment(linker,"/subsystem:\"windows\" /entry:\"wmainCRTStartup\"")//不显示窗口
+//#pragma comment(linker,"/subsystem:\"windows\" /entry:\"wmainCRTStartup\"")//不显示窗口
 typedef BOOL APITYPE;
 typedef BOOL KMDFAPI;
 
@@ -289,11 +289,12 @@ KMDFAPI stopDvr(CONST WCHAR serviceName[20])//驱动停止
 		status.dwCurrentState != SERVICE_STOP_PENDING
 		)
 	{
-		if (ControlService(           // 发送关闭服务请求
-			hs,                       // 服务句柄
+		if (0 == ControlService(                // 发送关闭服务请求
+			hs,                        // 服务句柄
 			SERVICE_CONTROL_STOP,     // 控制码：通知服务应该停止
-			&status                   // 接收最新的服务状态信息
-		) == 0)
+			&status              // 接收最新的服务状态信息
+			)
+		)
 		{
 			CloseServiceHandle(hs);
 			CloseServiceHandle(schSCManager);
@@ -302,7 +303,7 @@ KMDFAPI stopDvr(CONST WCHAR serviceName[20])//驱动停止
 		INT timeOut = 0;
 		while (status.dwCurrentState != SERVICE_STOPPED)// 判断超时
 		{
-			timeOut++;
+			++timeOut;
 			if (!QueryServiceStatus(hs, &status))
 				return FALSE;
 			Sleep(gapTime);
@@ -319,7 +320,7 @@ KMDFAPI stopDvr(CONST WCHAR serviceName[20])//驱动停止
 	return TRUE;
 }
 
-BOOL unloadDvr(CONST WCHAR serviceName[20])//驱动卸载
+BOOL uninstallDvr(CONST WCHAR serviceName[20])//驱动卸载
 {
 	SC_HANDLE schSCManager = OpenSCManager(// 打开服务控制管理器数据库
 		NULL,                              // 目标计算机的名称，NULL：连接本地计算机上的服务控制管理器
@@ -354,6 +355,11 @@ BOOL unloadDvr(CONST WCHAR serviceName[20])//驱动卸载
 /* 遵循 Microsoft Windows 命令行规则的 main 函数 */
 int _tmain(int argc, _TCHAR* argv[])//主函数
 {
+	setlocale(LC_CTYPE, "");
+	wcout.imbue(locale("chs", LC_CTYPE));
+	SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);//更改优先级
+	SetProcessPriorityBoost(GetCurrentProcess(), FALSE);//锁定优先级
+
 	if (argc == 1)
 	{
 		if (FindFirstFileExists(CCharToLpcwstr((GF_GetEXEPath() + InstDrv).c_str()), FALSE))
@@ -386,106 +392,131 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 	}
 	else if (argc <= 2)
 	{
-		cout << "错误：命令行参数太少！" << endl;
+		wcout << L"错误：命令行参数太少！" << endl;
 		return EOF;
 	}
-	_TCHAR ptName[MAX_PATH] = { 0 }, args[MAX_NUM][MAX_PATH] = { {0} };
+	_TCHAR ptName[MAX_PATH] = { 0 }, args[MAX_NUM][MAX_PATH] = { { 0 } };
+	int bRet = EXIT_SUCCESS;
 	for (int i = 0; i < argc - 2 && i < MAX_NUM; ++i)
 		lstrcpy(args[i], argv[i + 2]);
-	if (_wcsicmp(argv[1], L"/install") == 0)
+	if (_wcsicmp(argv[1], L"install") == 0 || _wcsicmp(argv[1], L"/install") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
 			if (installDvr(args[i], ptName) == TRUE)
-				wcout << "安装驱动 " << ptName << " 成功！" << endl;
+				wcout << (i + 1) << L" -> " << "安装驱动 " << ptName << " 成功！" << endl;
 			else
-				wcout << "安装驱动 " << ptName << " 失败！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"安装驱动 " << ptName << L" 失败！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/start") == 0)
+	else if (_wcsicmp(argv[1], L"start") == 0 || _wcsicmp(argv[1], L"/start") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
 			if (startDvr(ptName) == TRUE)
-				wcout << "启动驱动 " << ptName << " 成功！" << endl;
+				wcout << (i + 1) << L" -> " << L"启动驱动 " << ptName << L" 成功！" << endl;
 			else
-				wcout << "启动驱动 " << ptName << " 失败，您可以尝试重启后重新加载此驱动！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"启动驱动 " << ptName << L" 失败，您可以尝试重启后重新加载此驱动！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/stop") == 0)
+	else if (_wcsicmp(argv[1], L"stop") == 0 || _wcsicmp(argv[1], L"/stop") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
 			if (stopDvr(ptName) == TRUE)
-				wcout << "停止驱动 " << ptName << " 成功！" << endl;
+				wcout << (i + 1) << L" -> " << L"停止驱动 " << ptName << L" 成功！" << endl;
 			else
-				wcout << "停止驱动 " << ptName << " 失败！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"停止驱动 " << ptName << L" 失败！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/uninstall") == 0)
+	else if (_wcsicmp(argv[1], L"uninstall") == 0 || _wcsicmp(argv[1], L"/uninstall") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
-			if (unloadDvr(ptName) == TRUE)
-				wcout << "卸载驱动 " << ptName << " 成功！" << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
+			if (uninstallDvr(ptName) == TRUE)
+				wcout << (i + 1) << L" -> " << L"卸载驱动 " << ptName << L" 成功！" << endl;
 			else
-				wcout << "卸载驱动 " << ptName << " 失败！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"卸载驱动 " << ptName << L" 失败！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/uis") == 0)
+	else if (_wcsicmp(argv[1], L"uis") == 0 || _wcsicmp(argv[1], L"/uis") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
 			stopDvr(ptName);
-			unloadDvr(ptName);
+			uninstallDvr(ptName);
 			installDvr(args[i], ptName);
 			if (startDvr(ptName) == TRUE)
-				wcout << "部署驱动环境 " << ptName << " 成功！" << endl;
+				wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 成功！" << endl;
 			else
-				wcout << "部署驱动环境 " << ptName << " 失败！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 失败！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/rm") == 0)
+	else if (_wcsicmp(argv[1], L"rm") == 0 || _wcsicmp(argv[1], L"/rm") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << "错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				bRet = EXIT_FAILURE;
 				continue;
 			}
-			wcout << args[i] << endl;
+			wcout << (i + 1) << L" -> " << args[i] << endl;
 			stopDvr(ptName);
-			if (unloadDvr(ptName) == TRUE)
-				wcout << "清理驱动环境 " << ptName << " 成功！" << endl;
+			if (uninstallDvr(ptName) == TRUE)
+				wcout << (i + 1) << L" -> " << L"清理驱动环境 " << ptName << L" 成功！" << endl;
 			else
-				wcout << "清理驱动环境 " << ptName << " 失败！" << endl;
+			{
+				wcout << (i + 1) << L" -> " << L"清理驱动环境 " << ptName << L" 失败！" << endl;
+				bRet = EXIT_FAILURE;
+			}
 		}
-	else if (_wcsicmp(argv[1], L"/test") == 0)
+	else if (_wcsicmp(argv[1], L"test") == 0 || _wcsicmp(argv[1], L"/test") == 0)
 		testsigningon((_wcsicmp(argv[1], L"on") == 0) ? TRUE : FALSE);
 	else
 	{
-		cout << "错误：命令行参数不正确！" << endl;
+		wcout << L"错误：命令行参数不正确！" << endl;
 		return EOF;
 	}
-	return EXIT_SUCCESS;
+	return bRet;
 }
