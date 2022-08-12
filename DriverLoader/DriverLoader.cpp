@@ -18,6 +18,9 @@
 #ifndef EXIT_FAILURE
 #define EXIT_FAILURE 1
 #endif
+#ifndef EXIT_SCM_ERROR
+#define EXIT_SCM_ERROR 2
+#endif
 #ifndef EOF
 #define EOF (-1)
 #endif
@@ -37,7 +40,10 @@
 #define loopTime 80
 #endif
 #ifndef MAX_NUM
-#define MAX_NUM 20
+#define MAX_NUM 24
+#endif
+#ifndef NAME_SIZE
+#define NAME_SIZE 32
 #endif
 #ifndef InstDrv
 #define InstDrv "InstDrv.exe"
@@ -146,14 +152,14 @@ APITYPE getName(_TCHAR* lpcPath, _TCHAR* tpPath)
 	for (tmp = lstrlen(lpcPath) - 1; tmp >= 0; --tmp)
 		if (lpcPath[tmp] == '\\')
 			break;
-	if (tmp == 0)
+	if (0 == tmp)
 		return FALSE;
 	for (int i = 0; i < lstrlen(lpcPath) - tmp - 1; ++i)
 		tpPath[i] = lpcPath[i + tmp + 1];
 	for (tmp = 0; tmp < lstrlen(tpPath); ++tmp)//定位'.'
 		if (tpPath[tmp] == '.')
 			break;
-	if (tmp == 0)
+	if (0 == tmp)
 		return TRUE;
 	else
 		for (int i = lstrlen(tpPath) - 1; i >= tmp - 1; --i)//清空'.'
@@ -187,23 +193,36 @@ APITYPE FillPath(_TCHAR* lpcPath, _TCHAR* tpPath)
 APITYPE testsigningon(APITYPE bRet)
 {
 	if (bRet)
-		system("echo bcdedit /set testsigning on & bcdedit /set testsigning on & pause");
+		return 0 == system("echo bcdedit /set testsigning on & bcdedit /set testsigning on & pause") ? TRUE : FALSE;
 	else
-		system("echo bcdedit /set testsigning off & bcdedit /set testsigning off & pause");
-	return TRUE;
+		return 0 == system("echo bcdedit /set testsigning off & bcdedit /set testsigning off & pause") ? TRUE : FALSE;
 }
 
 
 /* 驱动相关操作 */
-KMDFAPI installDvr(CONST WCHAR drvPath[], CONST WCHAR serviceName[])//驱动安装
+KMDFAPI openSCM(SC_HANDLE& schSCManager)
 {
-	SC_HANDLE schSCManager = OpenSCManager(// 打开服务控制管理器数据库
+	schSCManager = OpenSCManager(// 打开服务控制管理器数据库
 		NULL,                              // 目标计算机的名称,NULL：连接本地计算机上的服务控制管理器
 		NULL,                              // 服务控制管理器数据库的名称，NULL：打开 SERVICES_ACTIVE_DATABASE 数据库
 		SC_MANAGER_ALL_ACCESS              // 所有权限
 	);
-	if (schSCManager == NULL)
-		return FALSE;
+	return schSCManager ? TRUE : FALSE;
+}
+
+KMDFAPI installDvr(SC_HANDLE schSCManager, CONST WCHAR drvPath[MAX_PATH], CONST WCHAR serviceName[NAME_SIZE])//驱动安装
+{
+	SC_HANDLE hs = OpenService(// 打开服务
+		schSCManager,          // 服务控件管理器数据库的句柄
+		serviceName,           // 要打开的服务名
+		SERVICE_QUERY_STATUS   // 服务访问权限
+	);
+	if (hs)// 服务已存在
+	{
+		CloseServiceHandle(hs);
+		CloseServiceHandle(schSCManager);
+		return TRUE;
+	}
 	SC_HANDLE schService = CreateService(// 创建服务对象，添加至服务控制管理器数据库
 		schSCManager,                    // 服务控件管理器数据库的句柄
 		serviceName,                     // 要安装的服务的名称
@@ -219,7 +238,7 @@ KMDFAPI installDvr(CONST WCHAR drvPath[], CONST WCHAR serviceName[])//驱动安�
 		NULL,                            // 运行服务的账户名：使用 LocalSystem 账户
 		NULL                             // LocalSystem 账户密码
 	);
-	if (schService == NULL)
+	if (NULL == schService)
 	{
 		CloseServiceHandle(schSCManager);
 		return FALSE;
@@ -229,85 +248,80 @@ KMDFAPI installDvr(CONST WCHAR drvPath[], CONST WCHAR serviceName[])//驱动安�
 	return TRUE;
 }
 
-KMDFAPI startDvr(CONST WCHAR serviceName[20])//驱动启动
+KMDFAPI startDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱动启动
 {
-	SC_HANDLE schSCManager = OpenSCManager(// 打开服务控制管理器数据库
-		NULL,                              // 目标计算机的名称,NULL：连接本地计算机上的服务控制管理器
-		NULL,                              // 服务控制管理器数据库的名称，NULL：打开 SERVICES_ACTIVE_DATABASE 数据库
-		SC_MANAGER_ALL_ACCESS              // 所有权限
-	);
-	if (schSCManager == NULL)
-		return FALSE;
 	SC_HANDLE hs = OpenService(// 打开服务
 		schSCManager,          // 服务控件管理器数据库的句柄
 		serviceName,           // 要打开的服务名
-		SERVICE_ALL_ACCESS     // 服务访问权限：所有权限
+		SERVICE_START          // 服务访问权限
 	);
-	if (hs == NULL)
-	{
-		CloseServiceHandle(schSCManager);
-		return FALSE;
-	}
-	if (StartService(hs, 0, 0) == 0)
-	{
-		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
-		return FALSE;
-	}
-	CloseServiceHandle(hs);
-	CloseServiceHandle(schSCManager);
-	return TRUE;
-}
-
-KMDFAPI stopDvr(CONST WCHAR serviceName[20])//驱动停止
-{
-	SC_HANDLE schSCManager = OpenSCManager(// 打开服务控制管理器数据库
-		NULL,                              // 目标计算机的名称，NULL：连接本地计算机上的服务控制管理器
-		NULL,                              // 服务控制管理器数据库的名称，NULL：打开 SERVICES_ACTIVE_DATABASE 数据库
-		SC_MANAGER_ALL_ACCESS              // 所有权限
-	);
-	if (schSCManager == NULL)
-		return FALSE;
-	SC_HANDLE hs = OpenService(// 打开服务
-		schSCManager,          // 服务控件管理器数据库的句柄
-		serviceName,           // 要打开的服务名
-		SERVICE_ALL_ACCESS     // 服务访问权限：所有权限
-	);
-	if (hs == NULL)
+	if (NULL == hs)// 服务不存在
 	{
 		CloseServiceHandle(schSCManager);
 		return FALSE;
 	}
 	SERVICE_STATUS status;
-	if (QueryServiceStatus(hs, &status) == 0)// 如果服务正在运行
+	if (QueryServiceStatus(hs, &status) == 0)// 请求服务信息
 	{
 		CloseServiceHandle(hs);
 		CloseServiceHandle(schSCManager);
 		return FALSE;
 	}
-	if (status.dwCurrentState != SERVICE_STOPPED &&
-		status.dwCurrentState != SERVICE_STOP_PENDING
-		)
+	if (SERVICE_RUNNING == status.dwCurrentState || SERVICE_START_PENDING == status.dwCurrentState)// 服务已启动或已在启动
 	{
-		if (0 == ControlService(                // 发送关闭服务请求
-			hs,                        // 服务句柄
-			SERVICE_CONTROL_STOP,     // 控制码：通知服务应该停止
-			&status              // 接收最新的服务状态信息
-			)
-		)
-		{
-			CloseServiceHandle(hs);
-			CloseServiceHandle(schSCManager);
+		CloseServiceHandle(hs);
+		CloseServiceHandle(schSCManager);
+		return TRUE;
+	}
+	BOOL bRet = (NULL != StartService(hs, NULL, NULL) ? TRUE : FALSE);// 启动服务
+	CloseServiceHandle(hs);
+	CloseServiceHandle(schSCManager);
+	return bRet;
+}
+
+KMDFAPI stopDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱动停止
+{
+	SC_HANDLE hs = OpenService(// 打开服务
+		schSCManager,          // 服务控件管理器数据库的句柄
+		serviceName,           // 要打开的服务名
+		SERVICE_STOP           // 服务访问权限：所有权限
+	);
+	if (NULL == hs)// 服务不存在
+	{
+		CloseServiceHandle(schSCManager);
+		return FALSE;
+	}
+	SERVICE_STATUS status;
+	if (QueryServiceStatus(hs, &status) == 0)// 请求服务信息
+	{
+		CloseServiceHandle(hs);
+		CloseServiceHandle(schSCManager);
+		return FALSE;
+	}
+	if (SERVICE_STOPPED == status.dwCurrentState || SERVICE_STOP_PENDING == status.dwCurrentState)// 服务已停止或正在停止
+	{
+		CloseServiceHandle(hs);
+		CloseServiceHandle(schSCManager);
+		return TRUE;
+	}
+
+	if (0 == ControlService(      // 发送关闭服务请求
+		hs,                       // 服务句柄
+		SERVICE_CONTROL_STOP,     // 控制码：通知服务应该停止
+		&status                   // 接收最新的服务状态信息
+	))
+	{
+		CloseServiceHandle(hs);
+		CloseServiceHandle(schSCManager);
+		return FALSE;
+	}
+	INT timeOut = 0;
+	while (status.dwCurrentState != SERVICE_STOPPED)// 判断超时
+	{
+		++timeOut;
+		if (!QueryServiceStatus(hs, &status))
 			return FALSE;
-		}
-		INT timeOut = 0;
-		while (status.dwCurrentState != SERVICE_STOPPED)// 判断超时
-		{
-			++timeOut;
-			if (!QueryServiceStatus(hs, &status))
-				return FALSE;
-			Sleep(gapTime);
-		}
+		Sleep(gapTime);
 		if (timeOut > loopTime)
 		{
 			CloseServiceHandle(hs);
@@ -320,21 +334,14 @@ KMDFAPI stopDvr(CONST WCHAR serviceName[20])//驱动停止
 	return TRUE;
 }
 
-BOOL uninstallDvr(CONST WCHAR serviceName[20])//驱动卸载
+KMDFAPI uninstallDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱动卸载
 {
-	SC_HANDLE schSCManager = OpenSCManager(// 打开服务控制管理器数据库
-		NULL,                              // 目标计算机的名称，NULL：连接本地计算机上的服务控制管理器
-		NULL,                              // 服务控制管理器数据库的名称，NULL：打开 SERVICES_ACTIVE_DATABASE 数据库
-		SC_MANAGER_ALL_ACCESS              // 所有权限
-	);
-	if (schSCManager == NULL)
-		return FALSE;
 	SC_HANDLE hs = OpenService(// 打开服务
 		schSCManager,          // 服务控件管理器数据库的句柄
 		serviceName,           // 要打开的服务名
 		SERVICE_ALL_ACCESS     // 服务访问权限：所有权限
 	);
-	if (hs == NULL)
+	if (NULL == hs)
 	{
 		CloseServiceHandle(schSCManager);
 		return FALSE;
@@ -348,6 +355,27 @@ BOOL uninstallDvr(CONST WCHAR serviceName[20])//驱动卸载
 	CloseServiceHandle(hs);
 	CloseServiceHandle(schSCManager);
 	return TRUE;
+}
+
+/* 显示帮助 */
+void showHelp()
+{
+	wcout << endl << L"描述：GooseBt 驱动加载程序" << endl << endl;
+	wcout << L"DriverLoader [首选项] [驱动文件路径] [...]" << endl << endl;
+	wcout << L"可用首参数列表：" << endl;
+	wcout << L"\tinstall\t\t安装" << endl;
+	wcout << L"\tstart\t\t启动" << endl;
+	wcout << L"\tstop\t\t停止" << endl;
+	wcout << L"\tuninstall\t卸载" << endl;
+	wcout << L"\tdeploy\t\t部署" << endl;
+	wcout << L"\tclean\t\t清理" << endl;
+	wcout << L"\t/? 或 -?\t显示此帮助" << endl << endl;
+	wcout << L"返回值说明：" << endl;
+	wcout << L"\t" << EXIT_SCM_ERROR << L"\t控制台打开失败" << endl;
+	wcout << L"\t" << EXIT_FAILURE << L"\t一个或多个驱动请求失败" << endl;
+	wcout << L"\t" << EXIT_SUCCESS << L"\t操作成功结束" << endl;
+	wcout << L"\t" << EOF << L"\t命令行参数不正确" << endl << endl;
+	return;
 }
 
 
@@ -367,7 +395,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 			char cmd[MAX_PATH] = { 0 };
 			strcpy_s(cmd, ("\"" + GF_GetEXEPath() + InstDrv + "\"").c_str());
 			if (system(cmd) != 2)
-				MessageBox(NULL, TEXT("初始化主面板失败！"), TEXT("Goosebt 驱动加载程序"), MB_OK | MB_ICONERROR | MB_TOPMOST);
+				MessageBox(NULL, TEXT("初始化主面板失败！"), TEXT("GooseBt 驱动加载程序"), MB_OK | MB_ICONERROR | MB_TOPMOST);
 			/*
 			STARTUPINFOA si;
 			PROCESS_INFORMATION pi;
@@ -378,7 +406,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 					NULL, cmd, NULL, NULL,
 					FALSE, SW_SHOW, NULL,
 					GF_GetEXEPath().c_str(), &si, &pi)
-				)
+			)
 				WaitForSingleObject(pi.hProcess, INFINITE);
 			else
 				MessageBox(NULL, TEXT("初始化主面板失败！"), TEXT("Goosebt 驱动加载程序"), MB_OK | MB_ICONERROR | MB_TOPMOST);
@@ -390,10 +418,28 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		else
 			return EXIT_FAILURE;
 	}
+	else if (argc == 2 && (
+			0 == _wcsicmp(argv[1], L"/?")
+			|| 0 == _wcsicmp(argv[1], L"-?")
+			|| 0 == _wcsicmp(argv[1], L"/help")
+			|| 0 == _wcsicmp(argv[1], L"-help")
+		)
+	)
+	{
+		showHelp();
+		return EXIT_SUCCESS;
+	}
 	else if (argc <= 2)
 	{
 		wcout << L"错误：命令行参数太少！" << endl;
 		return EOF;
+	}
+	SC_HANDLE schSCManager;
+	if (!openSCM(schSCManager))
+	{
+		wcout << L"打开服务控件管理器失败！" << endl;
+		MessageBox(NULL, TEXT("打开服务控件管理器失败！"), TEXT("GooseBt 驱动加载程序"), MB_OK | MB_ICONERROR | MB_TOPMOST);
+		return EXIT_SCM_ERROR;
 	}
 	_TCHAR ptName[MAX_PATH] = { 0 }, args[MAX_NUM][MAX_PATH] = { { 0 } };
 	int bRet = EXIT_SUCCESS;
@@ -404,12 +450,12 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << L"”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			if (installDvr(args[i], ptName) == TRUE)
+			if (installDvr(schSCManager, args[i], ptName))
 				wcout << (i + 1) << L" -> " << "安装驱动 " << ptName << " 成功！" << endl;
 			else
 			{
@@ -422,12 +468,12 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << L"”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			if (startDvr(ptName) == TRUE)
+			if (startDvr(schSCManager, ptName))
 				wcout << (i + 1) << L" -> " << L"启动驱动 " << ptName << L" 成功！" << endl;
 			else
 			{
@@ -440,12 +486,12 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << "”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			if (stopDvr(ptName) == TRUE)
+			if (stopDvr(schSCManager, ptName))
 				wcout << (i + 1) << L" -> " << L"停止驱动 " << ptName << L" 成功！" << endl;
 			else
 			{
@@ -458,12 +504,12 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << "。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << "”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			if (uninstallDvr(ptName) == TRUE)
+			if (uninstallDvr(schSCManager, ptName))
 				wcout << (i + 1) << L" -> " << L"卸载驱动 " << ptName << L" 成功！" << endl;
 			else
 			{
@@ -471,39 +517,44 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 				bRet = EXIT_FAILURE;
 			}
 		}
-	else if (_wcsicmp(argv[1], L"uis") == 0 || _wcsicmp(argv[1], L"/uis") == 0)
+	else if (_wcsicmp(argv[1], L"deploy") == 0 || _wcsicmp(argv[1], L"/deploy") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << L"”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			stopDvr(ptName);
-			uninstallDvr(ptName);
-			installDvr(args[i], ptName);
-			if (startDvr(ptName) == TRUE)
+			if (startDvr(schSCManager, ptName))
 				wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 成功！" << endl;
 			else
 			{
-				wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 失败！" << endl;
-				bRet = EXIT_FAILURE;
+				stopDvr(schSCManager, ptName);
+				uninstallDvr(schSCManager, ptName);
+				installDvr(schSCManager, args[i], ptName);
+				if (startDvr(schSCManager, ptName))
+					wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 成功！" << endl;
+				else
+				{
+					wcout << (i + 1) << L" -> " << L"部署驱动环境 " << ptName << L" 失败！" << endl;
+					bRet = EXIT_FAILURE;
+				}
 			}
 		}
-	else if (_wcsicmp(argv[1], L"rm") == 0 || _wcsicmp(argv[1], L"/rm") == 0)
+	else if (_wcsicmp(argv[1], L"clean") == 0 || _wcsicmp(argv[1], L"/clean") == 0)
 		for (int i = 0; i < argc - 2; ++i)
 		{
 			if (!FillPath(args[i], ptName))
 			{
-				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——" << argv[i + 2] << L"。" << endl;
+				wcout << (i + 1) << L" -> " << L"错误：系统找不到指定文件——“" << argv[i + 2] << L"”。" << endl;
 				bRet = EXIT_FAILURE;
 				continue;
 			}
 			wcout << (i + 1) << L" -> " << args[i] << endl;
-			stopDvr(ptName);
-			if (uninstallDvr(ptName) == TRUE)
+			stopDvr(schSCManager, ptName);
+			if (uninstallDvr(schSCManager, ptName))
 				wcout << (i + 1) << L" -> " << L"清理驱动环境 " << ptName << L" 成功！" << endl;
 			else
 			{
@@ -512,7 +563,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 			}
 		}
 	else if (_wcsicmp(argv[1], L"test") == 0 || _wcsicmp(argv[1], L"/test") == 0)
-		testsigningon((_wcsicmp(argv[1], L"on") == 0) ? TRUE : FALSE);
+		bRet = testsigningon((_wcsicmp(argv[1], L"on") == 0) ? TRUE : FALSE) ? EXIT_SUCCESS : EXIT_FAILURE;
 	else
 	{
 		wcout << L"错误：命令行参数不正确！" << endl;

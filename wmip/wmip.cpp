@@ -211,11 +211,23 @@
 #ifndef LogName
 #define LogName "wmipLog.log"
 #endif
+#ifndef DriverLoader
+#define DriverLoader "DriverLoader.exe"
+#endif
+#ifndef ZwTerminateProcess
+#define ZwTerminateProcess "ZwTerminateProcess.sys"
+#endif
+#ifndef DriverOption
+#define DriverOption "/deploy"
+#endif
 #ifndef L_DriverLoader
 #define L_DriverLoader L"DriverLoader.exe"
 #endif
 #ifndef L_ZwTerminateProcess
 #define L_ZwTerminateProcess L"ZwTerminateProcess.sys"
+#endif
+#ifndef L_DriverOption
+#define L_DriverOption L"/deploy"
 #endif
 #ifndef MAX_PATH
 #define MAX_PATH 260
@@ -1969,75 +1981,6 @@ typedef struct//包含有关 zip 文件的内部信息
 } unz_s, * unzFile;
 
 
-/* 与驱动通信函数 */
-int DriverConnector(char* msg, bool test)
-{
-	HANDLE device = NULL;
-	ULONG ret_len;
-	int ret = EXIT_SUCCESS;
-
-	/* 打开设备，每次要操作驱动对象时，先以此为例子打开设备 */
-	device = CreateFileW(CWK_DEV_SYM, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
-	if (device == INVALID_HANDLE_VALUE)
-	{
-		state = 41;
-		cout << states[state] << "（" << msg << "）" << endl;
-		return EXIT_DRIVER_ERROR;
-	}
-
-	if (test)//如果只是测试模式
-	{
-		/* 发送测试指令 */
-		char testMsg[] = "/test";
-		if (DeviceIoControl(device, CWK_DVC_SEND_STR, testMsg, (DWORD)(strlen(testMsg) + 1), NULL, 0, &ret_len, 0))
-			cout << "与驱动通讯成功！" << endl;
-		else
-		{
-			state = 42;
-			cout << states[state] << endl;
-			ret = EXIT_DRIVER_ERROR;
-		}
-	}
-	else//如果不是测试模式
-	{
-		/* 发送结束指令 */
-		if (DeviceIoControl(device, CWK_DVC_SEND_STR, msg, (DWORD)(strlen(msg) + 1), NULL, 0, &ret_len, 0))
-		{
-			if (strcmp(msg, "/DE") == 0 || strcmp(msg, "/De") == 0
-				|| strcmp(msg, "/dE") == 0 || strcmp(msg, "/de") == 0
-				|| strcmp(msg, "-DE") == 0 || strcmp(msg, "-De") == 0
-				|| strcmp(msg, "-dE") == 0 || strcmp(msg, "-de") == 0
-				)
-				cout << "通知驱动，驱动蓝屏！" << endl;
-			if (strcmp(msg, "/DR") == 0 || strcmp(msg, "/Dr") == 0
-				|| strcmp(msg, "/dR") == 0 || strcmp(msg, "/dr") == 0
-				|| strcmp(msg, "-DR") == 0 || strcmp(msg, "-Dr") == 0
-				|| strcmp(msg, "-dR") == 0 || strcmp(msg, "-dr") == 0
-				)
-				cout << "通知驱动，驱动重启！" << endl;
-#if (!(defined _WIN64 || defined WIN64))
-			else if (strcmp(msg, "/DS") == 0 || strcmp(msg, "/Ds") == 0
-				|| strcmp(msg, "/dS") == 0 || strcmp(msg, "/ds") == 0
-				|| strcmp(msg, "-DS") == 0 || strcmp(msg, "-Ds") == 0
-				|| strcmp(msg, "-dS") == 0 || strcmp(msg, "-ds") == 0
-				)
-				cout << "通知驱动，驱动关机！" << endl;
-#endif
-			else
-				cout << "通知驱动，结束进程——“" << msg << "”！" << endl;
-		}
-		else
-		{
-			cout << "\a错误：向驱动发送信息时发生异常！（" << msg << "）" << endl;
-			ret = EXIT_DRIVER_ERROR;
-		}
-	}
-
-	CloseHandle(device);//记得关闭
-	return ret;
-}
-
-
 /* Windows Hook */
 LRESULT __stdcall CBTHookProc1(long nCode, WPARAM wParam, LPARAM lParam)//并发编程 Funtion1
 {
@@ -2587,6 +2530,90 @@ APIType SelfProtection()//加载自我保护
 #else
 	return IatHook("Kernel32.dll", "OpenProcess", (DWORD)MyOpenProcess);
 #endif
+}
+
+
+/* 与驱动通信函数 */
+void runDriver()
+{
+	if (isAdmin())
+	{
+		string toExec = DriverLoader;
+		toExec += " ";
+		toExec += DriverOption;
+		toExec += " ";
+		toExec += ZwTerminateProcess;
+		system(toExec.c_str());
+	}
+	return;
+}
+
+int DriverConnector(char* msg, bool test)
+{
+	runDriver();
+	HANDLE device = NULL;
+	ULONG ret_len;
+	int ret = EXIT_SUCCESS;
+
+	/* 打开设备，每次要操作驱动对象时，先以此为例子打开设备 */
+	device = CreateFileW(CWK_DEV_SYM, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
+	if (device == INVALID_HANDLE_VALUE)
+	{
+		state = 41;
+		cout << states[state] << "（" << msg << "）" << endl;
+		return EXIT_DRIVER_ERROR;
+	}
+
+	if (test)//如果只是测试模式
+	{
+		/* 发送测试指令 */
+		char testMsg[] = "/test";
+		if (DeviceIoControl(device, CWK_DVC_SEND_STR, testMsg, (DWORD)(strlen(testMsg) + 1), NULL, 0, &ret_len, 0))
+			cout << "与驱动通讯成功！" << endl;
+		else
+		{
+			state = 42;
+			cout << states[state] << endl;
+			ret = EXIT_DRIVER_ERROR;
+		}
+	}
+	else//如果不是测试模式
+	{
+		/* 发送结束指令 */
+		if (DeviceIoControl(device, CWK_DVC_SEND_STR, msg, (DWORD)(strlen(msg) + 1), NULL, 0, &ret_len, 0))
+		{
+			if (strcmp(msg, "/DE") == 0 || strcmp(msg, "/De") == 0
+				|| strcmp(msg, "/dE") == 0 || strcmp(msg, "/de") == 0
+				|| strcmp(msg, "-DE") == 0 || strcmp(msg, "-De") == 0
+				|| strcmp(msg, "-dE") == 0 || strcmp(msg, "-de") == 0
+				)
+				cout << "通知驱动，驱动蓝屏！" << endl;
+			if (strcmp(msg, "/DR") == 0 || strcmp(msg, "/Dr") == 0
+				|| strcmp(msg, "/dR") == 0 || strcmp(msg, "/dr") == 0
+				|| strcmp(msg, "-DR") == 0 || strcmp(msg, "-Dr") == 0
+				|| strcmp(msg, "-dR") == 0 || strcmp(msg, "-dr") == 0
+				)
+				cout << "通知驱动，驱动重启！" << endl;
+#if (!(defined _WIN64 || defined WIN64))
+			else if (strcmp(msg, "/DS") == 0 || strcmp(msg, "/Ds") == 0
+				|| strcmp(msg, "/dS") == 0 || strcmp(msg, "/ds") == 0
+				|| strcmp(msg, "-DS") == 0 || strcmp(msg, "-Ds") == 0
+				|| strcmp(msg, "-dS") == 0 || strcmp(msg, "-ds") == 0
+				)
+				cout << "通知驱动，驱动关机！" << endl;
+#endif
+			else
+				cout << "通知驱动，结束进程——“" << msg << "”！" << endl;
+		}
+		else
+		{
+			cout << "\a错误：向驱动发送信息时发生异常！（" << msg << "）" << endl;
+			ret = EXIT_DRIVER_ERROR;
+		}
+	}
+
+	CloseHandle(device);//记得关闭
+	return ret;
 }
 
 
@@ -7476,11 +7503,7 @@ Function FunctionA()//全屏显示
 	DeleteMenu(GetSystemMenu(GetConsoleWindow(), FALSE), SC_CLOSE, MF_BYCOMMAND);//禁止窗口被关
 	SetWindowLong(hwnd, GWL_STYLE, (l_WinStyle | WS_POPUP | WS_MAXIMIZE) & ~WS_CAPTION & ~WS_THICKFRAME & ~WS_BORDER & ~WS_MAXIMIZEBOX & ~WS_MINIMIZEBOX & ~WS_SIZEBOX & ~WS_SYSMENU);//禁用菜单
 	SetWindowPos(hwnd, HWND_TOP, 0, 0, cx, cy, 0);
-	if (isAdmin()
-		&& FindFirstFileExists(L_DriverLoader, FALSE)
-		&& FindFirstFileExists(L_ZwTerminateProcess, FALSE)
-	)
-		system("DriverLoader.exe /start ZwTerminateProcess.sys");
+	runDriver();
 	return;
 }
 
@@ -8048,7 +8071,8 @@ Goose DriverNoProcess()//检测驱动级禁止创建进程
 	if (MessageBox(NULL, (hHook ?
 		TEXT("如果您开启了驱动级进程自我保护，请忽略此消息。\n在程序运行后，一个强大的驱动级程序配置了禁止创建进程或线程。\n此时，界面文字将无法正常显示，部分功能将无法正常使用。\n如果您使用了 PC Hunter Standard 禁止创建进程，请您取消配置。\n如果这不是您的主动操作，您的计算机可能已经中了 rookit 木马。") :
 		TEXT("如果您开启了驱动级进程自我保护，请忽略此消息。\n在程序运行后，一个强大的驱动级程序配置了禁止创建进程或线程。\n此时，界面文字将无法正常显示，部分功能将无法正常使用。\n如果您使用了 PC Hunter Standard 禁止创建进程，请您取消配置。\n如果这不是您的主动操作，您的计算机可能已经中了 rookit 木马。\n提示：点击“取消”可不再显示此消息。")),
-		WmipTextTitle, MB_OKCANCEL | MB_ICONWARNING | MB_TOPMOST) == IDCANCEL)
+		WmipTextTitle, MB_OKCANCEL | MB_ICONWARNING | MB_TOPMOST) == IDCANCEL
+	)
 		Reminder = 0;
 	return;
 }
@@ -8918,7 +8942,7 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 						HackChoices[i] = true;
 						++queue.tag;
 					}
-				if (queue.tag == 0)
+				if (0 == queue.tag)
 				{
 					cout << states[13] << endl;
 					return EXIT_WITH_NONE_SELECTED;

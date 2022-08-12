@@ -249,7 +249,7 @@ ServiceType DoSvcStartType(SC_HANDLE scmHandle)//修改服务
 	/* 更改服务信息 */
 	SC_LOCK sclLock;
 	sclLock = LockServiceDatabase(schService);
-	LPWSTR lpDescription = ConvertCharToLPWSTR("此服务由 GooseBt 打鹅工作室创建，是 GooseBt 第四代反病毒软件的支持服务。");
+	LPWSTR lpDescription = ConvertCharToLPWSTR("此服务由 GooseBt 团队创建，是 GooseBt 第四代反病毒软件的支持服务。");
 	SERVICE_DESCRIPTION description = { lpDescription };
 	ChangeServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, & description);
 	if (!ChangeServiceConfig(
@@ -263,7 +263,8 @@ ServiceType DoSvcStartType(SC_HANDLE scmHandle)//修改服务
 		NULL,                   // dependencies: no change
 		NULL,                   // account name: no change
 		NULL,                   // password: no change
-		NULL))                  // display name: no change
+		NULL                    // display name: no change
+	))
 	{
 		UnlockServiceDatabase(sclLock);
 		CloseServiceHandle(schService);
