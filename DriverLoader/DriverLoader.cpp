@@ -220,7 +220,6 @@ KMDFAPI installDvr(SC_HANDLE schSCManager, CONST WCHAR drvPath[MAX_PATH], CONST 
 	if (hs)// 服务已存在
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return TRUE;
 	}
 	SC_HANDLE schService = CreateService(// 创建服务对象，添加至服务控制管理器数据库
@@ -239,12 +238,8 @@ KMDFAPI installDvr(SC_HANDLE schSCManager, CONST WCHAR drvPath[MAX_PATH], CONST 
 		NULL                             // LocalSystem 账户密码
 	);
 	if (NULL == schService)
-	{
-		CloseServiceHandle(schSCManager);
 		return FALSE;
-	}
 	CloseServiceHandle(schService);
-	CloseServiceHandle(schSCManager);
 	return TRUE;
 }
 
@@ -256,27 +251,38 @@ KMDFAPI startDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//�
 		SERVICE_START          // 服务访问权限
 	);
 	if (NULL == hs)// 服务不存在
-	{
-		CloseServiceHandle(schSCManager);
 		return FALSE;
-	}
 	SERVICE_STATUS status;
 	if (QueryServiceStatus(hs, &status) == 0)// 请求服务信息
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return FALSE;
 	}
 	if (SERVICE_RUNNING == status.dwCurrentState || SERVICE_START_PENDING == status.dwCurrentState)// 服务已启动或已在启动
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return TRUE;
 	}
-	BOOL bRet = (NULL != StartService(hs, NULL, NULL) ? TRUE : FALSE);// 启动服务
+	if (NULL == StartService(hs, NULL, NULL))// 启动服务
+	{
+		CloseServiceHandle(hs);
+		return FALSE;
+	}
+	INT timeOut = 0;
+	while (status.dwCurrentState != SERVICE_RUNNING)// 判断超时
+	{
+		++timeOut;
+		if (!QueryServiceStatus(hs, &status))
+			return FALSE;
+		Sleep(gapTime);
+		if (timeOut > loopTime)
+		{
+			CloseServiceHandle(hs);
+			return FALSE;
+		}
+	}
 	CloseServiceHandle(hs);
-	CloseServiceHandle(schSCManager);
-	return bRet;
+	return TRUE;
 }
 
 KMDFAPI stopDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱动停止
@@ -287,21 +293,16 @@ KMDFAPI stopDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱
 		SERVICE_STOP           // 服务访问权限：所有权限
 	);
 	if (NULL == hs)// 服务不存在
-	{
-		CloseServiceHandle(schSCManager);
 		return FALSE;
-	}
 	SERVICE_STATUS status;
 	if (QueryServiceStatus(hs, &status) == 0)// 请求服务信息
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return FALSE;
 	}
 	if (SERVICE_STOPPED == status.dwCurrentState || SERVICE_STOP_PENDING == status.dwCurrentState)// 服务已停止或正在停止
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return TRUE;
 	}
 
@@ -312,7 +313,6 @@ KMDFAPI stopDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱
 	))
 	{
 		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
 		return FALSE;
 	}
 	INT timeOut = 0;
@@ -325,12 +325,10 @@ KMDFAPI stopDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])//驱
 		if (timeOut > loopTime)
 		{
 			CloseServiceHandle(hs);
-			CloseServiceHandle(schSCManager);
 			return FALSE;
 		}
 	}
 	CloseServiceHandle(hs);
-	CloseServiceHandle(schSCManager);
 	return TRUE;
 }
 
@@ -341,19 +339,12 @@ KMDFAPI uninstallDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])
 		serviceName,           // 要打开的服务名
 		SERVICE_ALL_ACCESS     // 服务访问权限：所有权限
 	);
+	BOOL bRet = FALSE;
 	if (NULL == hs)
-	{
-		CloseServiceHandle(schSCManager);
-		return FALSE;
-	}
-	if (DeleteService(hs) == 0)// 删除服务
-	{
-		CloseServiceHandle(hs);
-		CloseServiceHandle(schSCManager);
-		return FALSE;
-	}
+		return bRet;
+	if (0 != DeleteService(hs))// 删除服务
+		bRet = TRUE;
 	CloseServiceHandle(hs);
-	CloseServiceHandle(schSCManager);
 	return TRUE;
 }
 
@@ -566,8 +557,10 @@ int _tmain(int argc, _TCHAR* argv[])//主函数
 		bRet = testsigningon((_wcsicmp(argv[1], L"on") == 0) ? TRUE : FALSE) ? EXIT_SUCCESS : EXIT_FAILURE;
 	else
 	{
+		CloseServiceHandle(schSCManager);
 		wcout << L"错误：命令行参数不正确！" << endl;
 		return EOF;
 	}
+	CloseServiceHandle(schSCManager);
 	return bRet;
 }
