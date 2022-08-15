@@ -102,10 +102,30 @@
 #undef DriverName
 #endif
 #define DriverName "KMDFProcessProtector.sys"
-#ifdef InstDrv
-#undef InstDrv
+#ifdef DriverLoader
+#undef DriverLoader
 #endif
-#define InstDrv "InstDrv.exe"
+#define DriverLoader "DriverLoader.exe"
+#ifdef ZwTerminateProcess
+#undef ZwTerminateProcess
+#endif
+#define ZwTerminateProcess "ZwTerminateProcess.sys"
+#ifdef DriverDeployOption
+#undef DriverDeployOption
+#endif
+#define DriverDeployOption "deploy"
+#ifdef DriverStartOption
+#undef DriverStartOption
+#endif
+#define DriverStartOption "start"
+#ifdef DriverStopOption
+#undef DriverStopOption
+#endif
+#define DriverStopOption "stop"
+#ifdef DriverCleanOption
+#undef DriverCleanOption
+#endif
+#define DriverCleanOption "clean"
 #ifdef TitleText
 #undef TitleText
 #endif
@@ -127,12 +147,11 @@ APIType IsAboveVistaVersion(DWORD Win)//判断系统版本是否为 Win 或以�
 		return FALSE;
 }
 
-APIType IsAdmin()//是否具备管理员权限
+APIType isAdmin()//是否具备管理员权限
 {
-	BOOL b;
 	SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
 	PSID AdministratorsGroup;
-	b = AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &AdministratorsGroup);
+	BOOL b = AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &AdministratorsGroup);
 	if (b)
 	{
 		if (!CheckTokenMembership(NULL, AdministratorsGroup, &b))
@@ -314,12 +333,12 @@ ServiceType startService(SC_HANDLE& scmHandle)//启动服务
 		CloseServiceHandle(schService);
 
 		/* 通知驱动开启守护 */
-		string DriEvent = "\"", DriParam = "/s /i \"";
-		DriEvent += GF_GetEXEPath() + InstDrv + "\"";
-		DriParam += GF_GetEXEPath() + DriverName + "\"";
+		string DriEvent = "\"", DriParam = DriverDeployOption;
+		DriEvent += GF_GetEXEPath() + DriverLoader + "\"";
+		DriParam += " \"" + GF_GetEXEPath() + DriverName + "\"";
 		if (!getStart(DriEvent.c_str(), DriParam.c_str()))
 		{
-			//MessageBox(NULL, TEXT("错误：开启驱动守护失败，或驱动通讯不成功！"), TitleText, MB_OK | MB_ICONERROR | MB_TOPMOST);
+			MessageBox(NULL, TEXT("错误：开启驱动守护失败，或驱动通讯不成功！"), TitleText, MB_OK | MB_ICONERROR | MB_TOPMOST);
 			return ERROR_START_DRIVER;
 		}
 
@@ -472,7 +491,8 @@ ServiceType Fix(SC_HANDLE &scmHandle)//修复服务
 }
 
 
-/* 配合命令行的 main 函数 */
+
+/* 遵循 Microsoft Windows 命令行规则的 main 函数 */
 int _tmain(int argc, _TCHAR* argv[])
 {
 	setlocale(LC_CTYPE, "");
@@ -480,9 +500,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		return EOF;
 
 	/* 检查是否以管理员权限启动 */
-	if (!IsAdmin())
+	if (!isAdmin())
 	{
-		/*
 		_TCHAR _0[MAX_PATH] = { 0 };
 		GetModuleFileName(NULL, _0, MAX_PATH);
 		cout << "非管理员权限，尝试以管理员权限启动。" << endl;
@@ -492,7 +511,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			MessageBox(NULL, TEXT("提示：请以管理员权限启动本程序。"), TitleText, MB_OK | MB_ICONWARNING | MB_TOPMOST);
 			Sleep(DefaultTime << 1);
 		}
-		*/
 		return EXIT_FAILURE;
 	}
 
@@ -505,12 +523,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	
 	/* 通知驱动停止守护 */
-	string DriEvent = "\"", DriParam = "/s /u \"";
-	DriEvent += GF_GetEXEPath() + InstDrv + "\"";
-	DriParam += GF_GetEXEPath() + DriverName + "\"";
+	string DriEvent = "\"", DriParam = DriverStopOption;
+	DriEvent += GF_GetEXEPath() + DriverLoader + "\"";
+	DriParam += " \"" + GF_GetEXEPath() + DriverName + "\"";
 	if (!getStart(DriEvent.c_str(), DriParam.c_str()))
 	{
-		//MessageBox(NULL, TEXT("错误：与驱动通讯过程发生异常，或驱动停止失败！"), TitleText, MB_OK | MB_ICONERROR | MB_TOPMOST);
+		MessageBox(NULL, TEXT("错误：与驱动通讯过程发生异常，或驱动停止失败！"), TitleText, MB_OK | MB_ICONERROR | MB_TOPMOST);
 		return ERROR_STOP_DRIVER;
 	}
 
@@ -527,7 +545,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		return Fix(scmHandle);
 	else
 	{
-		//MessageBox(NULL, TEXT("警告：运行参数有误，请检查运行参数！"), TitleText, MB_OK | MB_ICONWARNING | MB_TOPMOST);
+		MessageBox(NULL, TEXT("警告：运行参数有误，请检查运行参数！"), TitleText, MB_OK | MB_ICONWARNING | MB_TOPMOST);
 		return EOF;
 	}
 	return EXIT_OUT_OF_SCHEDULE;

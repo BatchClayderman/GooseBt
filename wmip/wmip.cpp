@@ -217,8 +217,8 @@
 #ifndef ZwTerminateProcess
 #define ZwTerminateProcess "ZwTerminateProcess.sys"
 #endif
-#ifndef DriverOption
-#define DriverOption "/deploy"
+#ifndef DriverDeployOption
+#define DriverDeployOption "deploy"
 #endif
 #ifndef L_DriverLoader
 #define L_DriverLoader L"DriverLoader.exe"
@@ -226,8 +226,8 @@
 #ifndef L_ZwTerminateProcess
 #define L_ZwTerminateProcess L"ZwTerminateProcess.sys"
 #endif
-#ifndef L_DriverOption
-#define L_DriverOption L"/deploy"
+#ifndef L_DriverDeployOption
+#define L_DriverDeployOption L"deploy"
 #endif
 #ifndef MAX_PATH
 #define MAX_PATH 260
@@ -2540,7 +2540,7 @@ void runDriver()
 	{
 		string toExec = DriverLoader;
 		toExec += " ";
-		toExec += DriverOption;
+		toExec += DriverDeployOption;
 		toExec += " ";
 		toExec += ZwTerminateProcess;
 		system(toExec.c_str());
