@@ -339,11 +339,11 @@ KMDFAPI uninstallDvr(SC_HANDLE schSCManager, CONST WCHAR serviceName[NAME_SIZE])
 		serviceName,           // 要打开的服务名
 		SERVICE_ALL_ACCESS     // 服务访问权限：所有权限
 	);
-	BOOL bRet = FALSE;
-	if (NULL == hs)
+	BOOL bRet = TRUE;
+	if (NULL == hs)// 服务不存在
 		return bRet;
-	if (0 != DeleteService(hs))// 删除服务
-		bRet = TRUE;
+	if (0 == DeleteService(hs))// 删除服务
+		bRet = FALSE;
 	CloseServiceHandle(hs);
 	return TRUE;
 }
