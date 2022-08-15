@@ -24,9 +24,9 @@ A GUI written by C\#. This is used for automatic clicking and Bad HID testing.
 
 ## DriverLoader.exe
 
-Testing
+Release
 
-A console application to install and start GooseBt drivers. All functions are not stable still. Administrator permission is required. Commandline mode is supported. A tool written by others would be started if no valid arguments in commandline. 
+A console application to install and start GooseBt drivers at first but extended to a driver manager currently. Administrator permission is required. Commandline mode is supported. A tool written by others would be started if no options are in the commandline. 
 
 ## GooseBtDll.dll
 

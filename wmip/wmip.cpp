@@ -7781,8 +7781,8 @@ Function ArgHelp(_TCHAR* _tchar)//命令行帮助函数
 		cout << "\t" << EXIT_WITH_NONE_SELECTED << "\t\t目标对象为空" << endl;
 		cout << "\t" << EXIT_FILE_UNEXISTED << "\t\t系统找不到指定文件" << endl;
 		cout << "\t" << EXIT_OUT_OF_SCHEDULE << "\t\t进程意外中止" << endl;
-		cout << "\t[yyyy 0 xxxx]\t以 0 为界限分割目标数 yyyy 和成功数 xxxx" << endl;
-		cout << endl << endl << "注意事项：" << endl;
+		cout << "\t[yyyy 0 xxxx]\t以 0 为界限分割目标数 yyyy 和成功数 xxxx" << endl << endl << endl;
+		cout << "注意事项：" << endl;
 #ifdef _WIN64
 		cout << "\t本程序仅支持 64 位 Windows 操作系统；" << endl;
 #else
