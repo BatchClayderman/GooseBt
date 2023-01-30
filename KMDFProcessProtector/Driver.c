@@ -2,7 +2,20 @@
 #ifndef _KMDFProcessProtector_H
 #define _KMDFProcessProtector_H "KMDFProcessProtector"
 #ifndef toProtectCnt
-#define toProtectCnt 8
+#define toProtectCnt 9
+#endif
+#ifndef initProtectList
+#define initProtectList											\
+UNICODE_STRING toProtect[toProtectCnt];							\
+RtlInitUnicodeString(&toProtect[0], L"GooseBtMain.exe");		\
+RtlInitUnicodeString(&toProtect[1], L"GooseBtMonitor.exe");		\
+RtlInitUnicodeString(&toProtect[2], L"GooseBtTray.exe");		\
+RtlInitUnicodeString(&toProtect[3], L"GooseBtSVC.exe");			\
+RtlInitUnicodeString(&toProtect[4], L"GooseBtUpdate.exe");		\
+RtlInitUnicodeString(&toProtect[5], L"Scanner.exe");			\
+RtlInitUnicodeString(&toProtect[6], L"wmip.exe");				\
+RtlInitUnicodeString(&toProtect[7], L"wmif.exe");				\
+RtlInitUnicodeString(&toProtect[8], L"notepad.exe");
 #endif
 #ifndef PROCESS_NAME_LENGTH
 #define PROCESS_NAME_LENGTH 1024
@@ -19,8 +32,9 @@
 #define PROCESS_SET_INFORMATION            (0x0200)  
 #define PROCESS_QUERY_INFORMATION          (0x0400)  
 #define PROCESS_SUSPEND_RESUME             (0x0800)  
-#define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)  
+#define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)
 #endif//_KMDFProcessProtector_H
+UCHAR* PsGetProcessImageFileName(PEPROCESS Process);
 static size_t s_cf_proc_name_offset = 0;
 PVOID obHandle;//定义一个 void* 类型的变量，它将会作为 ObRegisterCallbacks 函数的第 2 个参数。
 
@@ -63,6 +77,23 @@ typedef struct _LDR_DATA_TABLE_ENTRY
 
 
 /** 自我保护函数 **/
+VOID cfCurProcNameInit()
+{
+	ULONG i;
+	PEPROCESS curproc = PsGetCurrentProcess();
+
+	/* 搜索 EPROCESS 结构，在其中找到字符串 */
+	for (i = 0; i < 3 * 4 * 1024; ++i)
+	{
+		if (!strncmp("System", (PCHAR)curproc + i, strlen("System")))
+		{
+			s_cf_proc_name_offset = i;
+			break;
+		}
+	}
+	return;
+}
+
 OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION pOperationInformation)
 {
 	UNREFERENCED_PARAMETER(RegistrationContext);
@@ -73,22 +104,13 @@ OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_IN
 	UNICODE_STRING proc_name;
 	WCHAR name_buf[PROCESS_NAME_LENGTH];
 	RtlInitEmptyUnicodeString(&proc_name, name_buf, PROCESS_NAME_LENGTH * sizeof(WCHAR));
-	// 这个名字是 ANSI 字符串，现在转化为 UNICODE 字符串。
 	RtlInitAnsiString(&ansi_name, ((PCHAR)curproc + s_cf_proc_name_offset));
 	need_len = RtlAnsiStringToUnicodeSize(&ansi_name);
 	if (need_len > proc_name.MaximumLength)
 		return OB_PREOP_SUCCESS;
-	RtlAnsiStringToUnicodeString(&proc_name, &ansi_name, FALSE);
-
-	UNICODE_STRING toProtect[toProtectCnt];
-	RtlInitUnicodeString(&toProtect[0], L"GooseBtMain.exe");
-	RtlInitUnicodeString(&toProtect[1], L"GooseBtMonitor.exe");
-	RtlInitUnicodeString(&toProtect[2], L"GooseBtTray.exe");
-	RtlInitUnicodeString(&toProtect[3], L"GooseBtSVC.exe");
-	RtlInitUnicodeString(&toProtect[4], L"GooseBtUpdate.exe");
-	RtlInitUnicodeString(&toProtect[5], L"Scanner.exe");
-	RtlInitUnicodeString(&toProtect[6], L"wmip.exe");
-	RtlInitUnicodeString(&toProtect[7], L"wmif.exe");
+	RtlAnsiStringToUnicodeString(&proc_name, &ansi_name, FALSE);// ANSI_STRING to UNICODE_STRING
+	
+	initProtectList
 	BOOLEAN isFilter = FALSE;
 	for (int i = 0; i < toProtectCnt; ++i)
 		if (0 == RtlCompareUnicodeString(&toProtect[i], &proc_name, TRUE))//忽略大小写
@@ -125,15 +147,13 @@ OB_PREOP_CALLBACK_STATUS preCall(PVOID RegistrationContext, POB_PRE_OPERATION_IN
 			//	pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_SUSPEND_RESUME;
 			if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_QUERY_LIMITED_INFORMATION) == PROCESS_QUERY_LIMITED_INFORMATION)
 				pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_QUERY_LIMITED_INFORMATION;
-
 		}
 	}
 	return OB_PREOP_SUCCESS;
 }
 
-NTSTATUS ProtectProcess(BOOLEAN Enable)
+NTSTATUS ProtectProcessByName()
 {
-	UNREFERENCED_PARAMETER(Enable);
 	OB_CALLBACK_REGISTRATION obReg;
 	OB_OPERATION_REGISTRATION opReg;
 
@@ -153,26 +173,88 @@ NTSTATUS ProtectProcess(BOOLEAN Enable)
 	return ObRegisterCallbacks(&obReg, &obHandle); //在这里注册回调函数
 }
 
-VOID cfCurProcNameInit()
-{
-	ULONG i;
-	PEPROCESS  curproc;
-	curproc = PsGetCurrentProcess();
 
-	/* 搜索 EPROCESS 结构，在其中找到字符串 */
-	for (i = 0; i < 3 * 4 * 1024; ++i)
-	{
-		if (!strncmp("System", (PCHAR)curproc + i, strlen("System")))
-		{
-			s_cf_proc_name_offset = i;
-			break;
-		}
-	}
+/** 隐藏保护函数 **/
+/* 隐藏线程 */
+VOID HideThreadsByEprocess(PEPROCESS pEprocess)
+{
+	RemoveEntryList((PLIST_ENTRY)(*(PULONGLONG)((char*)pEprocess + 0x030)));// KTHREAD -> ThreadListEntry
+	RemoveEntryList((PLIST_ENTRY)(*(PULONGLONG)((char*)pEprocess + 0x5e0)));// ETHREAD -> ThreadListEntry
 	return;
 }
 
+NTSTATUS HideThreadsByName()
+{
+	BOOLEAN bFlag = FALSE;
+	NTSTATUS ntstatus = 0;
+	PEPROCESS pEprocess = NULL;
 
-/** 隐藏保护函数 **/
+	initProtectList
+
+	/* 定位进程内核结构 */
+	for (size_t i = 4; i < 0x100000; i += 4)
+	{
+		ntstatus = PsLookupProcessByProcessId((HANDLE)i, &pEprocess);
+
+		if (NT_SUCCESS(ntstatus))
+		{
+			//释放内核对应引用计次
+			ObDereferenceObject(pEprocess);
+			//+0x5a8 ImageFileName : [15] UChar
+
+			/* 获取进程名 */
+			PUCHAR szProcessName = PsGetProcessImageFileName(pEprocess);
+			ANSI_STRING ansiBuffer = { 0 };
+			UNICODE_STRING unicodeBuffer = { 0 };
+			size_t szProcessNamelen = strlen((PCHAR)szProcessName);
+			ansiBuffer.Buffer = (PCHAR)szProcessName;
+			ansiBuffer.Length = ansiBuffer.MaximumLength = (USHORT)szProcessNamelen;
+			RtlAnsiStringToUnicodeString(&unicodeBuffer, &ansiBuffer, TRUE);
+
+			/* 判断 */
+			for (int j = 0; j < toProtectCnt; ++j)
+				if (0 == RtlCompareUnicodeString(&toProtect[j], &unicodeBuffer, TRUE))//忽略大小写
+				{
+					bFlag = TRUE;
+					HideThreadsByEprocess(pEprocess);
+				}
+		}
+	}
+
+	return bFlag ? STATUS_SUCCESS : STATUS_NOT_FOUND;
+}
+
+NTSTATUS HideProcessByName()
+{
+	PUCHAR szProcessName = PsGetProcessImageFileName(PsInitialSystemProcess);
+	UNICODE_STRING currentName = { 0 };
+	PLIST_ENTRY first = { 0 }, current = { 0 };
+	first = (PLIST_ENTRY)(((PUCHAR)PsInitialSystemProcess + 0x448));
+	current = first;
+	
+	initProtectList
+	BOOLEAN isExist = FALSE;
+	do
+	{
+		szProcessName = PsGetProcessImageFileName((PEPROCESS)((PUCHAR)current - 0x448));
+		ANSI_STRING ansiBuffer = { 0 };
+		size_t szProcessNamelen = strlen((PCHAR)szProcessName);
+		ansiBuffer.Buffer = (PCHAR)szProcessName;
+		ansiBuffer.Length = ansiBuffer.MaximumLength = (USHORT)szProcessNamelen;
+		RtlAnsiStringToUnicodeString(&currentName, &ansiBuffer, TRUE);
+		for (int i = 0; i < toProtectCnt; ++i)
+			if (0 == RtlCompareUnicodeString(&toProtect[i], &currentName, TRUE))//忽略大小写
+			{
+				isExist = TRUE;
+				current->Flink->Blink = current->Blink;//后一个结点的上一个结点指向当前结点的上一个结点
+				current->Blink->Flink = current->Flink;//前一个结点的下一个结点指向当前结点的下一个结点
+				break;//即使重复也过滤了所以可以直接 break 节约时间
+			}
+		current = current->Flink;//遍历下一个节点
+	} while (current != NULL && current != first);//strcmp(szProcessName, "") == 0
+	
+	return isExist ? STATUS_SUCCESS : STATUS_NOT_FOUND;
+}
 
 
 
@@ -289,7 +371,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObj, IN PUNICODE_STRING pRegistryS
 	UNREFERENCED_PARAMETER(pRegistryString);
 	DbgPrint("\n%s->DriverEntry()\n", _KMDFProcessProtector_H);
 
-	NTSTATUS		status[3] = { STATUS_SUCCESS, STATUS_SUCCESS, STATUS_SUCCESS };
+	NTSTATUS		status[4] = { STATUS_SUCCESS, STATUS_SUCCESS, STATUS_SUCCESS, STATUS_SUCCESS };
 	UNICODE_STRING  ustrLinkName;
 	UNICODE_STRING  ustrDevName;
 	PDEVICE_OBJECT  pDevObj;
@@ -335,17 +417,20 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObj, IN PUNICODE_STRING pRegistryS
 		IoDeleteDevice(pDevObj);
 		return status[0];
 	}
-
+	
+	/* Protect */
 	DbgPrint("%s->Trying to start protection. \n", _KMDFProcessProtector_H);
 	cfCurProcNameInit();
 	PLDR_DATA_TABLE_ENTRY ldr = (PLDR_DATA_TABLE_ENTRY)pDriverObj->DriverSection;
 	ldr->Flags |= 0x20;
-	status[1] = ProtectProcess(TRUE);
-	status[2];// = HideProcess((PUCHAR)"notepad.exe");
+	status[1] = ProtectProcessByName();
+	status[2] = HideProcessByName();
+	status[2] = HideThreadsByName();
 	DbgPrint("%s->Protection Start! \n", _KMDFProcessProtector_H);
 	DbgPrint("%s->Device = 0x%x\n", _KMDFProcessProtector_H, status[0]);
 	DbgPrint("%s->Self-Protection = 0x%x\n", _KMDFProcessProtector_H, status[1]);
-	DbgPrint("%s->Hidden-Protection = 0x%x\n", _KMDFProcessProtector_H, status[2]);
+	DbgPrint("%s->Hidden-Process-Protection = 0x%x\n", _KMDFProcessProtector_H, status[2]);
+	DbgPrint("%s->Hidden-Threads-Protection = 0x%x\n", _KMDFProcessProtector_H, status[3]);
 
 	return STATUS_SUCCESS;
 }

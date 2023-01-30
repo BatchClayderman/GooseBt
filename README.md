@@ -1,6 +1,6 @@
 # GooseBt
 
-Developing GooseBt Anti-virus Framework
+Developing GooseBt Malware Detection Framework (Anti-virus Framework)
 
 Scheduled -> Developing -> Testing -> Release
 
@@ -9,6 +9,8 @@ Scheduled -> Developing -> Testing -> Release
 Release
 
 This is a folder, which should be hidden. The folder provides script tools written in Batch and VBS language. When one is in Windows PE or extreme limitation mode including no drivers or services could be installed or started, the tools could do a favor. 
+
+Win DOS should be in release folder instead of project folder or code folder. For more about Win DOS, as well as its Linux version, please see [https://github.com/BatchClayderman/Win-Linux-DOS](https://github.com/BatchClayderman/Win-Linux-DOS). 
 
 ## AntiVirusMon.exe
 
@@ -105,6 +107,12 @@ A kernel driver to monitor Registry.
 Release
 
 A kernel driver to monitor data flows among serials. 
+
+## NTNoDriverLoad.sys
+
+Developing
+
+A kernel driver to prevent drivers from being loading. The driver also hides other GooseBt drivers when it launches. 
 
 ## NTNoFileCreate.sys
 
