@@ -1,6 +1,6 @@
 # GooseBt
 
-Developing GooseBt Anti-virus Framework
+Developing GooseBt Malware Detection Framework (Anti-virus Framework)
 
 Scheduled -> Developing -> Testing -> Release
 
