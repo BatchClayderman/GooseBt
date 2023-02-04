@@ -136,7 +136,7 @@ A console application to simply scan file on the disk, merely a second-generatio
 
 Testing
 
-A console application to install and start GooseBt service. The creation and starting are not stable still. Administrator permission is required. Only commandline mode is supported. Only commandline mode is supported. 
+A console application to install and start GooseBt service. The creation and starting are not stable still. Administrator permission is required. Only commandline mode is supported. 
 
 ## wmif.exe
 
@@ -160,7 +160,7 @@ A console application to manage registry. Only commandline mode is supported. On
 
 Release
 
-A kernel driver to delete file forcibly in kernel mode. Currently, it could not remove occuried or protected files still. Forcibly removing directory is not supported. 
+A kernel driver to delete file forcibly in kernel mode. Removing occupied files is supported. Removing those under kernel protection is not supported still. Forcibly removing directory is not supported. 
 
 ## ZwOpReg.sys
 

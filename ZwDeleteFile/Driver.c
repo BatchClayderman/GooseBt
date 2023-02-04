@@ -449,10 +449,680 @@ NTSTATUS IBinaryNtSetInformationFileDeleteFile(UNICODE_STRING uDeletePathName)//
 	return ntStatus;
 }
 
+NTSTATUS RetOpenFileHandle(UNICODE_STRING uDelFileName, PHANDLE pFileHandle)
+{
+	NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+	IO_STATUS_BLOCK iostu;
+	HANDLE hFileHandle = 0;
+	if (pFileHandle == NULL)
+		return STATUS_UNSUCCESSFUL;
+	if (KeGetCurrentIrql() > PASSIVE_LEVEL)
+		return 0;
+	if (uDelFileName.Length < 0 || uDelFileName.MaximumLength < 0)
+	{
+		return 0;
+	}
+	OBJECT_ATTRIBUTES ObjAttribute;
+	ObjAttribute.ObjectName = &uDelFileName;
+	ObjAttribute.SecurityDescriptor = NULL;
+	ObjAttribute.SecurityQualityOfService = NULL;
+	ObjAttribute.Attributes = OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE;
+	ObjAttribute.Length = sizeof(OBJECT_ATTRIBUTES);
+	/*  InitializeObjectAttributes(
+		  &ObjAttribute,
+		  &uDelFileName,
+		  OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+		  NULL, NULL);*/
+	ntStatus = IoCreateFile(&hFileHandle,
+		FILE_READ_ATTRIBUTES,
+		&ObjAttribute,
+		&iostu,
+		0,
+		FILE_ATTRIBUTE_NORMAL,
+		FILE_SHARE_DELETE,
+		FILE_OPEN,
+		0,
+		NULL,
+		0,
+		CreateFileTypeNone,
+		NULL,
+		IO_NO_PARAMETER_CHECKING
+	);
+	*pFileHandle = hFileHandle;
+	return ntStatus;
+}
+
+NTSTATUS CallBackIrpCompleteionProc(PDEVICE_OBJECT DeviceObject, PIRP Irp, PVOID Context)//去掉文件属性实现 CallBack 回调
+{
+	UNREFERENCED_PARAMETER(DeviceObject);
+	UNREFERENCED_PARAMETER(Context);
+	Irp->UserIosb->Status = Irp->IoStatus.Status;//操作系统会设置这个回调
+	Irp->UserIosb->Information = Irp->IoStatus.Information;
+	KeSetEvent(Irp->UserEvent, IO_NO_INCREMENT, FALSE);
+	IoFreeIrp(Irp);
+	return STATUS_MORE_PROCESSING_REQUIRED;
+}
+
+NTSTATUS PassFileattribute(PFILE_OBJECT pFileObj)
+{
+	/** 删除文件的第三种方式：
+	  * 步骤：
+	  * （1）申请IRP,初始化IRP
+	  * （2）初始化同步事件,以及设置回调.
+	  * （3）设置文件属性为默认
+	  * （4）发送IRP
+	*/
+
+	/* 1) 申请IRP,初始化IRP */
+	PDEVICE_OBJECT pNextDeviceObj = NULL;
+	PIRP pAllocIrp = NULL;
+	KEVENT IrpSynEvent = { 0 };// Irp 同步需要的事件同步
+	FILE_BASIC_INFORMATION fileBasciInfo = { 0 };
+	IO_STATUS_BLOCK iostu;
+	PIO_STACK_LOCATION IrpStack;
+	
+	pNextDeviceObj = IoGetRelatedDeviceObject(pFileObj);//通过文件对象获取其设备对象指针
+	if (pNextDeviceObj == NULL)
+		return STATUS_UNSUCCESSFUL;
+	
+	pAllocIrp = IoAllocateIrp(pNextDeviceObj->StackSize, TRUE);//通过设备对象指针确定申请的IRP的大小，注意在完成设置里面进行释放
+	if (pAllocIrp == NULL)
+		return STATUS_UNSUCCESSFUL;
+	//初始化Irp
+	//设置为自动,设置为无信号.
+	KeInitializeEvent(&IrpSynEvent, SynchronizationEvent, FALSE);
+	fileBasciInfo.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+	pAllocIrp->AssociatedIrp.SystemBuffer = &fileBasciInfo;
+	pAllocIrp->UserIosb = &iostu;
+	pAllocIrp->UserEvent = &IrpSynEvent;
+	pAllocIrp->Tail.Overlay.OriginalFileObject = pFileObj;
+	pAllocIrp->Tail.Overlay.Thread = (PETHREAD)KeGetCurrentThread();
+	//获取下层堆栈.进行设置.
+	//IrpStack  =
+	IrpStack = IoGetNextIrpStackLocation(pAllocIrp);
+	IrpStack->MajorFunction = IRP_MJ_SET_INFORMATION;
+	IrpStack->DeviceObject = pNextDeviceObj;
+	IrpStack->FileObject = pFileObj;
+	IrpStack->Parameters.SetFile.Length = sizeof(FILE_BASIC_INFORMATION);
+	IrpStack->Parameters.SetFile.FileObject = pFileObj;
+	IrpStack->Parameters.SetFile.FileInformationClass = FileBasicInformation;
+	//设置完成例程
+	IoSetCompletionRoutine(pAllocIrp, CallBackIrpCompleteionProc, &IrpSynEvent, TRUE, TRUE, TRUE);
+	//发送IRP
+	IoCallDriver(pNextDeviceObj, pAllocIrp);
+	//等待完成.
+	KeWaitForSingleObject(&IrpSynEvent, Executive, KernelMode, TRUE, NULL);
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS FsDeleteFile(PFILE_OBJECT pFileObj)
+{
+	/*
+  1.申请IRP,初始化IRP
+  2.初始化同步事件,以及设置回调.
+  3.设置文件属性为默认
+  4.发送IRP
+  核心:
+	核心是设置 FileObject中的域.进而删除正在运行中的文件
+  */
+	PDEVICE_OBJECT pNextDeviceObj = NULL;
+	PIRP pAllocIrp = NULL;
+	KEVENT IrpSynEvent = { 0 }; //Irp同步需要的事件同步
+	FILE_DISPOSITION_INFORMATION     fileBasciInfo = { 0 };  //注意此位置.已经变化为 FILE_DISPOSITION_INFORMATION
+	IO_STATUS_BLOCK iostu;
+	PIO_STACK_LOCATION IrpStack;
+	PSECTION_OBJECT_POINTERS pFileExe;  //注意此属性要设置为0.欺骗系统进行删除
+	//通过文件对象.获取其设备对象指针
+	pNextDeviceObj = IoGetRelatedDeviceObject(pFileObj);
+	if (pNextDeviceObj == NULL)
+		return STATUS_UNSUCCESSFUL;
+	//通过设备对象指针.确定申请的IRP的大小,注意在完成设置里面进行释放.
+	pAllocIrp = IoAllocateIrp(pNextDeviceObj->StackSize, TRUE);
+	if (pAllocIrp == NULL)
+		return STATUS_UNSUCCESSFUL;
+	//初始化Irp
+	//设置为自动,设置为无信号.
+	KeInitializeEvent(&IrpSynEvent, SynchronizationEvent, FALSE);
+	fileBasciInfo.DeleteFile = TRUE;        //设置标记为删除
+	pAllocIrp->AssociatedIrp.SystemBuffer = &fileBasciInfo;
+	pAllocIrp->UserIosb = &iostu;
+	pAllocIrp->UserEvent = &IrpSynEvent;
+	pAllocIrp->Tail.Overlay.OriginalFileObject = pFileObj;
+	pAllocIrp->Tail.Overlay.Thread = (PETHREAD)KeGetCurrentThread();
+	//获取下层堆栈.进行设置.
+	//IrpStack  =
+	IrpStack = IoGetNextIrpStackLocation(pAllocIrp);
+	IrpStack->MajorFunction = IRP_MJ_SET_INFORMATION;
+	IrpStack->DeviceObject = pNextDeviceObj;
+	IrpStack->FileObject = pFileObj;
+	IrpStack->Parameters.SetFile.Length = sizeof(FILE_DISPOSITION_INFORMATION);
+	IrpStack->Parameters.SetFile.FileObject = pFileObj;
+	IrpStack->Parameters.SetFile.FileInformationClass = FileDispositionInformation;
+	//设置完成例程
+	IoSetCompletionRoutine(pAllocIrp, CallBackIrpCompleteionProc, &IrpSynEvent, TRUE, TRUE, TRUE);
+	//删除正在运行中的文件.
+	pFileExe = pFileObj->SectionObjectPointer;
+	pFileExe->DataSectionObject = 0;
+	pFileExe->ImageSectionObject = 0;
+	//发送IRP
+	IoCallDriver(pNextDeviceObj, pAllocIrp);
+	//等待完成.
+	KeWaitForSingleObject(&IrpSynEvent, Executive, KernelMode, TRUE, NULL);
+	return STATUS_SUCCESS;
+}
+NTSTATUS IrpDeleteFileRun(UNICODE_STRING uDelFileName)
+{
+	KdBreakPoint();
+	NTSTATUS ntStatus = STATUS_UNSUCCESSFUL;
+	/*
+	1.首先通过发送IRP去掉文件的属性
+	2.设置文件属性为删除.进行发送IRP强删文件.
+	*/
+	HANDLE hFileHandle = { 0 };
+	PFILE_OBJECT  pFileObject = NULL;
+	//sep1 : OpenFile Get File Handle
+	ntStatus = RetOpenFileHandle(uDelFileName, &hFileHandle);
+	if (!NT_SUCCESS(ntStatus))
+	{
+		goto ExitAnRelease;
+	}
+	//sep2:  Chang File Handle to FileObject
+	ntStatus = ObReferenceObjectByHandle(
+		hFileHandle,
+		GENERIC_ALL,
+		*IoFileObjectType,
+		KernelMode,
+		&pFileObject,
+		NULL);
+	if (!NT_SUCCESS(ntStatus))
+	{
+		goto ExitAnRelease;
+	}
+	//setp 3:  Pass File Atribute
+	KdBreakPoint();
+	ntStatus = PassFileattribute(pFileObject);
+	if (!NT_SUCCESS(ntStatus))
+	{
+		goto ExitAnRelease;
+	}
+	//setp 4: Send Irp DeleteFile
+	KdBreakPoint();
+	ntStatus = FsDeleteFile(pFileObject);
+	if (!NT_SUCCESS(ntStatus))
+	{
+		goto ExitAnRelease;
+	}
+ExitAnRelease:
+	if (pFileObject != NULL)
+		ObDereferenceObject(pFileObject);
+	if (hFileHandle != NULL)
+		ZwClose(hFileHandle);
+	return ntStatus;
+}
+
 BOOLEAN GooseBtZwDeleteFile(UNICODE_STRING us)
 {
 	close_all_file_handles(&us.Buffer[4]);
-	return NT_SUCCESS(IBinaryNtZwDeleteFile(us)) || NT_SUCCESS(IBinaryNtSetInformationFileDeleteFile(us));
+	return NT_SUCCESS(IBinaryNtZwDeleteFile(us)) || NT_SUCCESS(IBinaryNtSetInformationFileDeleteFile(us)) || NT_SUCCESS(IrpDeleteFileRun(us)) || dfDelFile(us.Buffer);
+}
+
+
+
+
+PDEVICE_OBJECT	g_HookDevice;
+
+NTSTATUS dfQuerySymbolicLink(
+	IN PUNICODE_STRING SymbolicLinkName,
+	OUT PUNICODE_STRING LinkTarget
+)
+{
+	OBJECT_ATTRIBUTES oa;
+	NTSTATUS status;
+	HANDLE handle;
+
+	InitializeObjectAttributes(
+		&oa,
+		SymbolicLinkName,
+		OBJ_CASE_INSENSITIVE,
+		0,
+		0
+	);
+
+	status = ZwOpenSymbolicLinkObject(&handle, GENERIC_READ, &oa);
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
+
+	LinkTarget->MaximumLength = 1024 * sizeof(WCHAR);
+	LinkTarget->Length = 0;
+	LinkTarget->Buffer = ExAllocatePool2(PagedPool, LinkTarget->MaximumLength, 'A0');
+	if (!LinkTarget->Buffer)
+	{
+		ZwClose(handle);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	RtlZeroMemory(LinkTarget->Buffer, LinkTarget->MaximumLength);
+
+	status = ZwQuerySymbolicLinkObject(handle, LinkTarget, NULL);
+	ZwClose(handle);
+
+	if (!NT_SUCCESS(status))
+	{
+		ExFreePool(LinkTarget->Buffer);
+	}
+
+	return status;
+}
+
+BOOLEAN dfCloseFileHandle(WCHAR* name)
+{
+
+	NTSTATUS					 status;
+	PVOID						 buf = NULL;
+	PSYSTEM_HANDLE_INFORMATION 	 pSysHandleInfo;
+	SYSTEM_HANDLE_TABLE_ENTRY_INFO handleTEI;
+
+	ULONG						size = 1;
+	ULONG						NumOfHandle = 0;
+	ULONG						i;
+	CLIENT_ID 					cid;
+	HANDLE						hHandle;
+	HANDLE						hProcess;
+	HANDLE 						hDupObj;
+	//HANDLE						hFile;
+	//HANDLE						link_handle;
+	OBJECT_ATTRIBUTES 			oa;
+	//ULONG						FileType;
+	ULONG						processID;
+	UNICODE_STRING 				uLinkName;
+	UNICODE_STRING				uLink;
+	//OBJECT_ATTRIBUTES 			objectAttributes;
+	//IO_STATUS_BLOCK 		 	IoStatus;
+	ULONG 						ulRet;
+	PVOID    			 		fileObject;
+	POBJECT_NAME_INFORMATION 	pObjName = { 0 };
+	UNICODE_STRING				delFileName = { 0 };
+	//int							length;
+	WCHAR						wVolumeLetter[3];
+	WCHAR* pFilePath;
+	UNICODE_STRING				uVolume;
+	UNICODE_STRING				uFilePath;
+	//UNICODE_STRING 				NullString = RTL_CONSTANT_STRING(L"");
+	BOOLEAN					bRet = FALSE;
+
+
+	for (size = 1; ; size *= 2) //句柄表是动态变化的，所以不知道多大的buffer存放合适，从1B开始 指数增长
+	{
+		if (NULL == (buf = ExAllocatePool2(NonPagedPool, size, 'FILE')))
+		{
+			DbgPrint(("alloc mem failed\n"));
+			goto Exit;
+		}
+		RtlZeroMemory(buf, size);
+		status = ZwQuerySystemInformation(0x10, buf, size, NULL); //不像ZwEnumerateValueKey函数把参数传NULL就返回buffer的实际大小，所以就需要调整buffer的大小
+		if (!NT_SUCCESS(status))
+		{
+			if (STATUS_INFO_LENGTH_MISMATCH == status) //这样写是为了在编译阶段发现status = STATUS_INFO_LENGTH_MISMATCH的错误
+			{
+				ExFreePool(buf);
+				buf = NULL;
+			}
+			else
+			{
+				DbgPrint(("ZwQuerySystemInformation() failed"));
+				goto Exit;
+			}
+		}
+		else
+		{
+			break; //直到buffer能存放全局句柄表退出循环
+		}
+	}
+
+	pSysHandleInfo = (PSYSTEM_HANDLE_INFORMATION)buf;
+	NumOfHandle = pSysHandleInfo->NumberOfHandles; //句柄个数
+
+
+	//句柄表只有handle和打开这个句柄的进程的PID，所以需要把句柄转换成具体的文件名，
+	//而且转换过来的这个文件名是\device\harddiskvolume3\haha.doc这种格式的，但删除文件的文件名硬编码成这种格式"\??\c:\haha.doc",所以还需要转换一下格式
+	/* Get the volume character like C: */
+	//\??\c:\haha.doc-->\device\harddiskvolume3\haha.doc
+
+	wVolumeLetter[0] = name[4];
+	wVolumeLetter[1] = name[5];
+	wVolumeLetter[2] = 0;
+	uLinkName.Buffer = ExAllocatePool2(NonPagedPool, 256 + sizeof(ULONG), 'A1');
+	uLinkName.MaximumLength = 256;
+	RtlInitUnicodeString(&uVolume, wVolumeLetter);
+	RtlInitUnicodeString(&uLink, L"\\DosDevices\\");
+	RtlCopyUnicodeString(&uLinkName, &uLink);
+
+	status = RtlAppendUnicodeStringToString(&uLinkName, &uVolume);
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("RtlAppendUnicodeStringToString() failed"));
+		return FALSE;
+	}
+
+	dfQuerySymbolicLink(&uLinkName, &delFileName);
+	RtlFreeUnicodeString(&uLinkName);
+	KdPrint(("delFileName:%wZ", &delFileName));
+
+	pFilePath = (WCHAR*)&name[6];
+	RtlInitUnicodeString(&uFilePath, pFilePath);
+
+	RtlAppendUnicodeStringToString(&delFileName, &uFilePath);
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("RtlAppendUnicodeStringToString() failed"));
+		return FALSE;
+	}
+
+	KdPrint(("delFile:%wZ", &delFileName));
+
+	for (i = 0; i < NumOfHandle; i++) //遍历全局句柄表
+	{
+		handleTEI = pSysHandleInfo->Handles[i];
+		if (handleTEI.ObjectTypeIndex != 25 && handleTEI.ObjectTypeIndex != 28)//28文件,25设备对象
+			continue;
+		processID = (ULONG)handleTEI.UniqueProcessId; //打开该句柄的进程PID
+		cid.UniqueProcess = (HANDLE)processID;
+		cid.UniqueThread = (HANDLE)0;
+		hHandle = (HANDLE)handleTEI.HandleValue;
+		InitializeObjectAttributes(&oa, NULL, 0, NULL, NULL);
+		status = ZwOpenProcess(&hProcess, PROCESS_DUP_HANDLE, &oa, &cid); //打开打开该句柄的进程，目的是把目标进程的句柄拷贝到当前进程中来，因为句柄不跨进程只在同一个进程有效，如果把句柄传给另一个进程，它是无效的，只能通过目标进程来访问该句柄
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("ZwOpenProcess:%d Fail ", processID));
+			continue;
+		}
+
+		status = ZwDuplicateObject(hProcess, hHandle, NtCurrentProcess(), &hDupObj, \
+			PROCESS_ALL_ACCESS, 0, DUPLICATE_SAME_ACCESS); //第一次拷贝，把句柄从`独占`它的进程空间中`拷贝`过来
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint(("ZwDuplicateObject1 : Fail "));
+			continue;
+		}
+		status = ObReferenceObjectByHandle( //根据句柄得到文件的内核对象
+			hDupObj,
+			FILE_ANY_ACCESS,
+			0,
+			KernelMode,
+			&fileObject,
+			NULL);
+
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint(("ObReferenceObjectByHandle : Fail "));
+			continue;
+		}
+
+		pObjName = (POBJECT_NAME_INFORMATION)ExAllocatePool2(NonPagedPool, \
+			sizeof(OBJECT_NAME_INFORMATION) + 1024 * sizeof(WCHAR), 'A1');
+		if (!pObjName)
+			goto Exit;
+		if (STATUS_SUCCESS != (status = ObQueryNameString(fileObject, pObjName, \
+			sizeof(OBJECT_NAME_INFORMATION) + 1024 * sizeof(WCHAR), &ulRet))) //查询文件内核对象对应的文件名
+		{
+			ObDereferenceObject(fileObject);
+			continue;
+		}
+		if (RtlCompareUnicodeString(&pObjName->Name, &delFileName, TRUE) == 0) //相等，则是要找被独占的强删的文件
+		{
+
+			ObDereferenceObject(fileObject);
+			ZwClose(hDupObj);
+
+			status = ZwDuplicateObject(hProcess, hHandle, NtCurrentProcess(), &hDupObj, \
+				PROCESS_ALL_ACCESS, 0, DUPLICATE_SAME_ACCESS | DUPLICATE_CLOSE_SOURCE); //第二次拷贝，把句柄从`独占`它的进程空间中`拷贝`过来，同时把这个句柄从目标进程中`关闭掉`(函数传参传入这个参数`DUPLICATE_CLOSE_SOURCE`)
+			if (!NT_SUCCESS(status))
+			{
+				DbgPrint(("ZwDuplicateObject2 : Fail "));
+				//return FALSE;
+			}
+			else
+			{
+				ZwClose(hDupObj);
+				bRet = TRUE;
+				//return TRUE;
+			}
+			break;
+
+		}
+
+		ExFreePool(pObjName);
+		pObjName = NULL;
+
+		ObDereferenceObject(fileObject);
+		ZwClose(hDupObj);
+		ZwClose(hProcess);
+
+	}
+
+Exit:
+	if (pObjName != NULL)
+	{
+		ExFreePool(pObjName);
+		pObjName = NULL;
+	}
+	if (delFileName.Buffer != NULL)
+	{
+		ExFreePool(delFileName.Buffer);
+	}
+	if (buf != NULL)
+	{
+		ExFreePool(buf);
+		buf = NULL;
+	}
+	return(bRet);
+
+}
+
+NTSTATUS
+dfOpenFile(WCHAR* name, PHANDLE phFileHandle, ACCESS_MASK access, ULONG share)
+{
+
+	IO_STATUS_BLOCK iosb;
+	NTSTATUS stat;
+	OBJECT_ATTRIBUTES oba;
+	UNICODE_STRING nameus;
+
+	if (KeGetCurrentIrql() > PASSIVE_LEVEL) { return 0; }
+	RtlInitUnicodeString(&nameus, name);
+	InitializeObjectAttributes(
+		&oba,
+		&nameus,
+		OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+		0,
+		0);
+	stat = IoCreateFile(
+		phFileHandle,
+		access,
+		&oba,
+		&iosb,
+		0,
+		FILE_ATTRIBUTE_NORMAL,
+		share,
+		FILE_OPEN,
+		0,
+		NULL,
+		0,
+		0,
+		NULL,
+		IO_NO_PARAMETER_CHECKING); //不要进行参数校验，IoCreateFile才会调用成功
+
+	return stat;
+}
+
+NTSTATUS
+dfSkillSetFileCompletion(
+	IN PDEVICE_OBJECT DeviceObject,
+	IN PIRP Irp,
+	IN PVOID Context
+)
+{
+	UNREFERENCED_PARAMETER(DeviceObject);
+	UNREFERENCED_PARAMETER(Context);
+	Irp->UserIosb->Status = Irp->IoStatus.Status;
+	Irp->UserIosb->Information = Irp->IoStatus.Information;
+
+	KeSetEvent(Irp->UserEvent, IO_NO_INCREMENT, FALSE);
+
+	IoFreeIrp(Irp);
+
+	return STATUS_MORE_PROCESSING_REQUIRED;
+}
+BOOLEAN dfDelFile(WCHAR* name)
+{
+	NTSTATUS        ntStatus = STATUS_SUCCESS;
+	PFILE_OBJECT    fileObject;
+	PDEVICE_OBJECT  DeviceObject;
+	PIRP            Irp;
+	KEVENT          event;
+	FILE_DISPOSITION_INFORMATION  FileInformation;
+	IO_STATUS_BLOCK ioStatus;
+	PIO_STACK_LOCATION irpSp;
+	PSECTION_OBJECT_POINTERS pSectionObjectPointer;
+	HANDLE handle;
+	OBJECT_ATTRIBUTES                	objAttributes = { 0 };
+	InitializeObjectAttributes(&objAttributes,
+		&name,
+		OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+		NULL,
+		NULL);
+	/// 1.打开文件
+	ntStatus = dfOpenFile(name, &handle, FILE_READ_ATTRIBUTES | DELETE, FILE_SHARE_DELETE);
+	if (ntStatus == STATUS_OBJECT_NAME_NOT_FOUND || //传的名字错了或者路径错了
+		ntStatus == STATUS_OBJECT_PATH_NOT_FOUND)
+	{
+		return FALSE;
+	}
+	else if (!NT_SUCCESS(ntStatus))
+	{
+		/// 2.a抹除文件的只读属性
+		//ntStatus = dfOpenFile(name, &handle, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE);
+		ntStatus = ZwCreateFile(
+			&handle,
+			SYNCHRONIZE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+			&objAttributes,
+			&ioStatus,
+			NULL,
+			FILE_ATTRIBUTE_NORMAL,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			FILE_OPEN,
+			FILE_SYNCHRONOUS_IO_NONALERT,
+			NULL,
+			0);
+		if (NT_SUCCESS(ntStatus))
+		{
+			FILE_BASIC_INFORMATION        basicInfo = { 0 };
+
+			ntStatus = ZwQueryInformationFile(handle, &ioStatus,
+				&basicInfo, sizeof(basicInfo), FileBasicInformation); //把文件的基本属性读出来
+			if (!NT_SUCCESS(ntStatus))
+			{
+
+			}
+
+			basicInfo.FileAttributes = FILE_ATTRIBUTE_NORMAL; //改成normal
+			ntStatus = ZwSetInformationFile(handle, &ioStatus,
+				&basicInfo, sizeof(basicInfo), FileBasicInformation); //把修改后的属性在写回去
+			if (!NT_SUCCESS(ntStatus))
+			{
+
+			}
+		}
+		/// 2.b 遍历全局句柄表，关闭独占打开的句柄
+		if (dfCloseFileHandle(name))
+		{
+			ntStatus = dfOpenFile(name, &handle, FILE_READ_ATTRIBUTES | DELETE, FILE_SHARE_DELETE); //再次打开文件，就会得到文件的句柄
+			if (!NT_SUCCESS(ntStatus))
+				return FALSE;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+
+	ntStatus = ObReferenceObjectByHandle(handle, //根据句柄拿到内核对象，因为句柄不跨进程只在同一个进程有效，如果把句柄传给另一个进程，它是无效的。所以一般是拿到handle之后直接得到它的`fileobject`
+		DELETE,
+		*IoFileObjectType, //如果没有指定一个句柄的类型，攻击者可以传入非文件类型的句柄从而造成系统漏洞，得到其他类型的内核对象，对应的结构体的定义里很可能没有一些成员，就会行为未定义或者无效内存，下面如果访问这些缺少的成员，系统会崩溃，造成蓝屏。
+		KernelMode,
+		&fileObject,
+		NULL);
+
+	if (!NT_SUCCESS(ntStatus))
+	{
+		DbgPrint("ObReferenceObjectByHandle()");
+		ZwClose(handle);
+		return FALSE;
+	}
+
+	DeviceObject = IoGetRelatedDeviceObject(fileObject); //通过fileObject拿到文件所在的设备对象，用来接受Irp
+	/// 3. 构建IRP删除文件
+	Irp = IoAllocateIrp(DeviceObject->StackSize, TRUE);
+
+	if (Irp == NULL)
+	{
+		ObDereferenceObject(fileObject);
+		ZwClose(handle);
+		return FALSE;
+	}
+
+	KeInitializeEvent(&event, SynchronizationEvent, FALSE); //初始化事件，synchronization事件:自动恢复，比如声控灯。FALSE表示最初为无信号状态
+
+	FileInformation.DeleteFile = TRUE;
+
+	Irp->AssociatedIrp.SystemBuffer = &FileInformation;
+	Irp->UserEvent = &event;
+	Irp->UserIosb = &ioStatus;
+	Irp->Tail.Overlay.OriginalFileObject = fileObject;
+	Irp->Tail.Overlay.Thread = (PETHREAD)KeGetCurrentThread();
+	Irp->RequestorMode = KernelMode;
+
+	irpSp = IoGetNextIrpStackLocation(Irp);
+	irpSp->MajorFunction = IRP_MJ_SET_INFORMATION;
+	irpSp->DeviceObject = DeviceObject;
+	irpSp->FileObject = fileObject;
+	irpSp->Parameters.SetFile.Length = sizeof(FILE_DISPOSITION_INFORMATION);
+	irpSp->Parameters.SetFile.FileInformationClass = FileDispositionInformation;
+	irpSp->Parameters.SetFile.FileObject = fileObject;
+
+	/// 为当前IRP设置一个完成例程，相当于回调函数，当下层驱动将Irp结束之后就会调用这个完成例程
+	IoSetCompletionRoutine(
+		Irp,
+		dfSkillSetFileCompletion, //完成例程，在完成例程里面设置事件，通过这个事件通知上层驱动，上层驱动才知道Irp完成了，并且知道Irp的完成状态
+		&event,
+		TRUE,
+		TRUE,
+		TRUE);
+
+	/// 2.b 删除正在运行中的exe所做的处理，欺骗操作系统
+	pSectionObjectPointer = fileObject->SectionObjectPointer;
+	if (pSectionObjectPointer)
+	{
+		pSectionObjectPointer->ImageSectionObject = 0;
+		pSectionObjectPointer->DataSectionObject = 0;
+	}
+	/// 3. 将Irp往下发
+	ntStatus = IoCallDriver(DeviceObject, Irp);
+	if (!NT_SUCCESS(ntStatus))
+	{
+		ObDereferenceObject(fileObject);
+		ZwClose(handle);
+		return FALSE;
+	}
+	/// 等待完成例程中事件发生，NULL表示无限等待
+	KeWaitForSingleObject(&event, Executive, KernelMode, TRUE, NULL);
+	//IoFreeIrp(Irp);
+	ObDereferenceObject(fileObject);
+	ZwClose(handle);
+	return TRUE;
+
 }
 
 
@@ -476,5 +1146,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriver, PUNICODE_STRING pPath)
 	if (!NT_SUCCESS(bRet))
 		return bRet;
 	pDriver->DriverUnload = DriverUnload;
+	UNICODE_STRING uDelFileName = { 0 };
+	RtlInitUnicodeString(&uDelFileName, L"\\DosDevices\\C:\\Users\\Universe\\Desktop\\GooseBtMain.exe");
+	//GooseBtZwDeleteFile(uDelFileName);
+	dfDelFile(L"\\DosDevices\\D:\\1.txt");
 	return STATUS_SUCCESS;
 }

