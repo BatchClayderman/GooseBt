@@ -18,6 +18,56 @@ Scheduled
 
 A console application to test the loading of DLL file. Currently, it has nothing to do since GooseBtDll.dll has nothing to do. 
 
+## CfgDynamic.cfg
+
+Release
+
+The dynamic config file. An example is shown as follows. 
+
+```
+void OnDelete(GObject object) // File deletion detected
+{
+	if (object.source.imagename == "rd.exe")
+	{
+		if object.target.dirpath == "C:\\Windows\\system32")
+		{
+			object.options = '2';
+			object.flags = FLAGS_NO_WARNINGS | FLAGS_FAILED_ERRORSCREEN;
+		}
+		else
+		{
+			object.options = '0';
+			object.flags = FLAGS_NO_ALERTS | FLAGS_SECURE_PROCESS;
+		}
+	}
+	else
+	{
+		object.options = 'Q';
+		object.flags = FLAGS_NORMAL;
+	}
+	return;
+}
+```
+
+## CfgStatic.cfg
+
+Release
+
+The static config file. An example is shown as follows. 
+
+```
+"\\??\\C:\\Windows\\system32\\\*": 
+{
+	"create": '1', 
+	"read": '0', 
+	"write": '1', 
+	"delete": '2', 
+	"rename": '1', 
+	"exec": '0', 
+	"flags": '0', 
+}
+```
+
 ## ClickProgram.exe
 
 Scheduled
