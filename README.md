@@ -8,9 +8,9 @@ Scheduled -> Developing -> Testing -> Release
 
 Release
 
-This is a folder, which should be hidden. The folder provides script tools written in Batch and VBS language. When one is in Windows PE or extreme limitation mode including no drivers or services could be installed or started, the tools could do a favor. 
+This is a folder, which should be hidden. The folder provides script tools written in Batch and VBS language. When one is in Windows PE, safety mode, or extreme limitation mode including no drivers or services that could be installed or started, the tools could do a favor. 
 
-Win DOS should be in release folder instead of project folder or code folder. For more about Win DOS, as well as its Linux version, please see [https://github.com/BatchClayderman/Win-Linux-DOS](https://github.com/BatchClayderman/Win-Linux-DOS). 
+Win DOS should be in release folder instead of the project folder or code folder. For more about Win DOS, as well as its Linux version, please see [https://github.com/BatchClayderman/Win-Linux-DOS](https://github.com/BatchClayderman/Win-Linux-DOS). 
 
 ## AntiVirusMon.exe
 
@@ -29,7 +29,7 @@ void OnDelete(GObject object) // File deletion detected
 {
 	if (object.source.imagename == "rd.exe")
 	{
-		if object.target.dirpath == "C:\\Windows\\system32")
+		if (object.target.dirpath == "C:\\Windows\\system32")
 		{
 			object.options = '2';
 			object.flags = FLAGS_NO_WARNINGS | FLAGS_FAILED_ERRORSCREEN;
